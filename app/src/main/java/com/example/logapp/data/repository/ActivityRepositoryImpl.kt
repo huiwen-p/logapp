@@ -1,7 +1,8 @@
 package com.example.logapp.data.repository
 
-import com.example.logapp.data.database.dao.ActivityDao
-import com.example.logapp.data.model.ActivityEntity
+import com.example.logapp.data.local.dao.ActivityDao
+import com.example.logapp.data.local.entity.ActivityEntity
+import com.example.logapp.domain.repository.ActivityRepository
 import kotlinx.coroutines.flow.Flow
 
 class ActivityRepositoryImpl(

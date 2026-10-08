@@ -11,9 +11,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.logapp.ui.theme.LogappTheme
+import com.example.logapp.core.theme.LogappTheme
 
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+// import com.example.logapp.ui.activity.ActivityListScreen
+import com.example.logapp.feature.tracking.HomeScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -26,7 +31,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = androidx.compose.material3.MaterialTheme.colorScheme.background
                 ) {
-                    com.example.logapp.ui.activity.ActivityListScreen()
+                    com.example.logapp.feature.navigation.AppNavigation()
                 }
             }
         }

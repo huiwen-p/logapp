@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "545936233113",
+    "project_id": "logapp-timelens",
+    "storage_bucket": "logapp-timelens.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:545936233113:android:fd869e8cc69fab9e0e5e08",
+        "android_client_info": {
+          "package_name": "com.example.logapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "545936233113-l1dc3s53fund30iq7oit2201t2iiqsk5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.logapp",
+            "certificate_hash": "5b4ea0a06484b85338221717097ab6376600fbb8"
+          }
+        },
+        {
+          "client_id": "545936233113-irqdjppbm33kp1pn531jokn4u8qtm1ff.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDg2nvhE9WamnGR3xD3EJqfIWLPUEhNyGo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "545936233113-irqdjppbm33kp1pn531jokn4u8qtm1ff.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

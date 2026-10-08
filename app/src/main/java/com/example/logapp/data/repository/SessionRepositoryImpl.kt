@@ -1,7 +1,8 @@
 package com.example.logapp.data.repository
 
-import com.example.logapp.data.database.dao.SessionDao
-import com.example.logapp.data.model.ActivitySessionEntity
+import com.example.logapp.data.local.dao.SessionDao
+import com.example.logapp.data.local.entity.ActivitySessionEntity
+import com.example.logapp.domain.repository.SessionRepository
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
