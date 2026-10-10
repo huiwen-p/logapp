@@ -32,7 +32,7 @@ fun ActivityCard(
     modifier: Modifier = Modifier
 ) {
     val cardColor = MaterialTheme.colorScheme.surfaceVariant
-    val iconColor = MaterialTheme.colorScheme.primary
+    val iconColor = color?.let { Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary
 
     Surface(
         modifier = modifier

@@ -7,32 +7,39 @@ import com.example.logapp.domain.repository.SessionRepository
 import com.example.logapp.domain.repository.SyncMetadataRepository
 import com.example.logapp.domain.repository.TransactionProvider
 import java.time.Instant
+import java.util.UUID
 import javax.inject.Inject
 
-class EditSessionUseCase @Inject constructor(
+class CreateManualSessionUseCase @Inject constructor(
     private val sessionRepository: SessionRepository,
     private val syncMetadataRepository: SyncMetadataRepository,
     private val transactionProvider: TransactionProvider
 ) {
-    suspend operator fun invoke(session: ActivitySessionEntity, newStartTime: Instant, newEndTime: Instant?, newNote: String?) {
-        if (newEndTime != null && newEndTime.isBefore(newStartTime)) {
+    suspend operator fun invoke(activityId: String, startTime: Instant, endTime: Instant, note: String?) {
+        if (endTime.isBefore(startTime)) {
             throw IllegalArgumentException("End time must be after or equal to start time")
         }
-        val updatedSession = session.copy(
-            startedAt = newStartTime,
-            endedAt = newEndTime,
-            note = newNote,
+
+        val sessionId = UUID.randomUUID().toString()
+        val session = ActivitySessionEntity(
+            id = sessionId,
+            activityId = activityId,
+            startedAt = startTime,
+            endedAt = endTime,
+            note = note,
+            createdAt = Instant.now(),
             updatedAt = Instant.now(),
-            version = session.version + 1
+            version = 1
         )
+
         transactionProvider.runAsTransaction {
-            sessionRepository.updateSession(updatedSession)
+            sessionRepository.insertSession(session)
             syncMetadataRepository.insertMetadata(
                 SyncMetadataEntity(
-                    entityId = updatedSession.id,
+                    entityId = sessionId,
                     entityType = "SESSION",
-                    operation = "UPDATE",
-                    localVersion = updatedSession.version,
+                    operation = "INSERT",
+                    localVersion = 1,
                     syncStatus = SyncStatus.PENDING
                 )
             )

@@ -42,7 +42,7 @@ fun ActivityFormBottomSheet(
 ) {
     var name by remember { mutableStateOf(activity?.name ?: "") }
     var selectedColor by remember { 
-        mutableStateOf(activity?.color?.let { Color(it) } ?: ColorPalette.first()) 
+        mutableStateOf(activity?.color?.let { Color(it.toInt()) } ?: ColorPalette.first()) 
     }
 
     ModalBottomSheet(
@@ -104,7 +104,7 @@ fun ActivityFormBottomSheet(
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
-                        onSave(name.trim(), selectedColor.value.toLong(), "default")
+                        onSave(name.trim(), selectedColor.toArgb().toLong(), "default")
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),

@@ -20,8 +20,18 @@ class MergeSessionUseCase @Inject constructor(
             throw IllegalArgumentException("Cannot merge sessions from different activities")
         }
 
+        val (first, second) = if (session1.startedAt.isBefore(session2.startedAt)) {
+            session1 to session2
+        } else {
+            session2 to session1
+        }
+
+        if (first.endedAt != null && first.endedAt.isBefore(second.startedAt)) {
+            throw IllegalArgumentException("Cannot merge sessions that have a gap between them")
+        }
+
         val now = Instant.now()
-        val mergedStart = if (session1.startedAt.isBefore(session2.startedAt)) session1.startedAt else session2.startedAt
+        val mergedStart = first.startedAt
         
         val end1 = session1.endedAt ?: now
         val end2 = session2.endedAt ?: now

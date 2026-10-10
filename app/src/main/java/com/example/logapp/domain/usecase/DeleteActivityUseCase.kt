@@ -16,7 +16,7 @@ class DeleteActivityUseCase @Inject constructor(
         
         if (sessions.isNotEmpty()) {
             return Result.failure(
-                IllegalStateException("Không thể xoá Activity vì đã có lịch sử session. Hãy dùng tính năng Archive để thay thế.")
+                com.example.logapp.domain.exception.ActivityHasSessionsException()
             )
         }
         

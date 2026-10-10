@@ -131,7 +131,7 @@ fun ManageActivitiesScreen(
                                         modifier = Modifier
                                             .size(24.dp)
                                             .clip(CircleShape)
-                                            .background(item.color?.let { Color(it) } ?: MaterialTheme.colorScheme.primary)
+                                            .background(item.color?.let { Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary)
                                     )
                                     Spacer(modifier = Modifier.width(16.dp))
                                     Text(

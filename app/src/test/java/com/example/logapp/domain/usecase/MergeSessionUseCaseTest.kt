@@ -100,4 +100,28 @@ class MergeSessionUseCaseTest {
 
         useCase.invoke(s1, s2)
     }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun testMergeSession_withGap_throwsException() = runBlocking {
+        val sessionRepo = FakeSessionRepository()
+        val syncRepo = FakeSyncMetadataRepository()
+        val transactionProvider = FakeTransactionProvider()
+        val useCase = MergeSessionUseCase(sessionRepo, syncRepo, transactionProvider)
+
+        val s1 = ActivitySessionEntity(
+            id = "S1", activityId = "Act1",
+            startedAt = Instant.parse("2026-09-30T08:00:00Z"),
+            endedAt = Instant.parse("2026-09-30T09:00:00Z"),
+            createdAt = Instant.now(), updatedAt = Instant.now()
+        )
+        val s2 = ActivitySessionEntity(
+            id = "S2", activityId = "Act1",
+            startedAt = Instant.parse("2026-09-30T10:00:00Z"),
+            endedAt = Instant.parse("2026-09-30T11:00:00Z"),
+            createdAt = Instant.now(), updatedAt = Instant.now()
+        )
+
+        // Gap is from 09:00 to 10:00, so it should throw exception
+        useCase.invoke(s1, s2)
+    }
 }
