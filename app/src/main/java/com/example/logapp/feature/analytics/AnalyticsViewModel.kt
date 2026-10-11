@@ -103,4 +103,28 @@ class AnalyticsViewModel @Inject constructor(
     fun setDate(date: LocalDate) {
         _selectedDate.update { date }
     }
+
+    fun previousPeriod() {
+        _selectedDate.update { date ->
+            when (_selectedTab.value) {
+                AnalyticsTab.DAILY -> date.minusDays(1)
+                AnalyticsTab.WEEKLY -> date.minusWeeks(1)
+                AnalyticsTab.MONTHLY -> date.minusMonths(1)
+            }
+        }
+    }
+
+    fun nextPeriod() {
+        _selectedDate.update { date ->
+            when (_selectedTab.value) {
+                AnalyticsTab.DAILY -> date.plusDays(1)
+                AnalyticsTab.WEEKLY -> date.plusWeeks(1)
+                AnalyticsTab.MONTHLY -> date.plusMonths(1)
+            }
+        }
+    }
+
+    fun resetToCurrentPeriod() {
+        _selectedDate.update { LocalDate.now() }
+    }
 }

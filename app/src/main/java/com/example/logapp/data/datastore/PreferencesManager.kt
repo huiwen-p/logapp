@@ -20,6 +20,7 @@ class PreferencesManager(private val context: Context) {
         val BACKUP_KEEP_COUNT = intPreferencesKey("backup_keep_count")
         val THEME_MODE = stringPreferencesKey("theme_mode") // "system", "light", "dark"
         val DAY_BOUNDARY = stringPreferencesKey("day_boundary") // "00:00", "04:00", etc.
+        val LAST_BACKUP_TIME = stringPreferencesKey("last_backup_time")
 
         fun parseDayBoundary(boundary: String?): Pair<Int, Int> {
             if (boundary.isNullOrBlank()) return Pair(0, 0)
@@ -57,6 +58,10 @@ class PreferencesManager(private val context: Context) {
         preferences[DAY_BOUNDARY] ?: "00:00"
     }
 
+    val lastBackupTime: Flow<String?> = context.dataStore.data.map { preferences ->
+        preferences[LAST_BACKUP_TIME]
+    }
+
     suspend fun setAutoBackupEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[AUTO_BACKUP_ENABLED] = enabled
@@ -84,6 +89,12 @@ class PreferencesManager(private val context: Context) {
     suspend fun setDayBoundary(boundary: String) {
         context.dataStore.edit { preferences ->
             preferences[DAY_BOUNDARY] = boundary
+        }
+    }
+
+    suspend fun setLastBackupTime(timeIsoString: String) {
+        context.dataStore.edit { preferences ->
+            preferences[LAST_BACKUP_TIME] = timeIsoString
         }
     }
 }

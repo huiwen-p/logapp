@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.logapp.core.designsystem.component.LogAppElevatedCard
 import com.example.logapp.core.designsystem.component.LogAppPrimaryButton
@@ -113,6 +114,7 @@ fun HomeScreen(
                                 session = session,
                                 activityName = activityName,
                                 activityColor = activity?.color,
+                                icon = activity?.icon,
                                 onStop = {
                                     viewModel.stopSession(session)
                                     coroutineScope.launch {
@@ -254,6 +256,7 @@ fun HomeScreen(
                         ActivityCard(
                             name = activity.name,
                             color = activity.color,
+                            icon = activity.icon,
                             isActive = isRunning,
                             onClick = { viewModel.startActivity(activity.id) }
                         )
@@ -269,6 +272,7 @@ fun ActiveSessionItem(
     session: ActivitySessionEntity,
     activityName: String,
     activityColor: Long? = null,
+    icon: String? = null,
     onStop: () -> Unit
 ) {
     var duration by remember { mutableStateOf(Duration.between(session.startedAt, Instant.now())) }
@@ -309,7 +313,7 @@ fun ActiveSessionItem(
 
             Spacer(modifier = Modifier.width(spacing.small))
 
-            // Initial icon letter
+            // Initial icon letter or emoji
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -317,12 +321,19 @@ fun ActiveSessionItem(
                     .background(iconColor.copy(alpha = 0.2f)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = activityName.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = iconColor,
-                    fontWeight = FontWeight.Bold
-                )
+                if (!icon.isNullOrBlank()) {
+                    Text(
+                        text = icon,
+                        fontSize = 18.sp
+                    )
+                } else {
+                    Text(
+                        text = activityName.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = iconColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(spacing.small))

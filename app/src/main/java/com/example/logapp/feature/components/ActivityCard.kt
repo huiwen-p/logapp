@@ -32,7 +32,8 @@ fun ActivityCard(
     color: Long?, // ARGB color as Long
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    isActive: Boolean = false
+    isActive: Boolean = false,
+    icon: String? = null
 ) {
     val cardColor = if (isActive) {
         MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
@@ -77,12 +78,19 @@ fun ActivityCard(
                         .background(iconColor.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = name.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = iconColor,
-                        fontWeight = FontWeight.Bold
-                    )
+                    if (!icon.isNullOrBlank()) {
+                        Text(
+                            text = icon,
+                            fontSize = 20.sp
+                        )
+                    } else {
+                        Text(
+                            text = name.take(1).uppercase(),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = iconColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
                 Text(
                     text = name,

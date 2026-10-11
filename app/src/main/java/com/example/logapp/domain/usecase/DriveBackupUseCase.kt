@@ -22,6 +22,7 @@ class DriveBackupUseCase @Inject constructor(
             val uploadResult = driveBackupManager.uploadBackupFile(jsonContent)
             
             if (uploadResult.isSuccess) {
+                preferencesManager.setLastBackupTime(java.time.Instant.now().toString())
                 // SRS #38: Backup Rotation (Keep configured number of backups, default 7)
                 val keepCount = preferencesManager.backupKeepCount.first()
                 driveBackupManager.deleteOldBackups(keepCount = keepCount)

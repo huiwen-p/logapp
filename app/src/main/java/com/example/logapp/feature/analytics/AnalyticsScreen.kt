@@ -3,25 +3,40 @@ package com.example.logapp.feature.analytics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.logapp.feature.analytics.components.RingChart
-import com.example.logapp.feature.analytics.components.WeeklyBarChart
+import com.example.logapp.core.designsystem.component.*
+import com.example.logapp.core.designsystem.tokens.semanticColors
+import com.example.logapp.core.designsystem.tokens.spacing
+import com.example.logapp.data.local.entity.ActivityEntity
+import com.example.logapp.domain.engine.DailyAnalytics
+import com.example.logapp.domain.engine.MonthlyAnalytics
+import com.example.logapp.domain.engine.WeeklyAnalytics
 import com.example.logapp.feature.analytics.components.MonthlyHeatmap
 import com.example.logapp.feature.analytics.components.RelationshipStats
-import com.example.logapp.domain.engine.DailyAnalytics
-import com.example.logapp.domain.engine.WeeklyAnalytics
-import com.example.logapp.domain.engine.MonthlyAnalytics
+import com.example.logapp.feature.analytics.components.RingChart
+import com.example.logapp.feature.analytics.components.WeeklyBarChart
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.time.Duration
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,7 +49,13 @@ fun AnalyticsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Analytics", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.displayMedium) }
+                title = {
+                    Text(
+                        text = "Phân tích & Thống kê",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
             )
         }
     ) { padding ->
@@ -42,438 +63,779 @@ fun AnalyticsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            TabRow(selectedTabIndex = state.selectedTab.ordinal) {
+            // Tab Selection (Day / Week / Month)
+            SecondaryTabRow(
+                selectedTabIndex = state.selectedTab.ordinal,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary
+            ) {
                 Tab(
                     selected = state.selectedTab == AnalyticsTab.DAILY,
                     onClick = { viewModel.setTab(AnalyticsTab.DAILY) },
-                    text = { Text("Daily") }
+                    text = { Text("Ngày (Day)", fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = state.selectedTab == AnalyticsTab.WEEKLY,
                     onClick = { viewModel.setTab(AnalyticsTab.WEEKLY) },
-                    text = { Text("Weekly") }
+                    text = { Text("Tuần (Week)", fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = state.selectedTab == AnalyticsTab.MONTHLY,
                     onClick = { viewModel.setTab(AnalyticsTab.MONTHLY) },
-                    text = { Text("Monthly") }
+                    text = { Text("Tháng (Month)", fontWeight = FontWeight.Bold) }
                 )
             }
-            
-            if (state.selectedTab == AnalyticsTab.DAILY) {
-                state.dailyAnalytics?.let { data ->
-                    DailyAnalyticsContent(data, state)
-                } ?: run {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+
+            // Period Navigation Bar
+            PeriodNavigationBar(
+                selectedTab = state.selectedTab,
+                selectedDate = state.selectedDate,
+                onPrevious = { viewModel.previousPeriod() },
+                onNext = { viewModel.nextPeriod() },
+                onResetToday = { viewModel.resetToCurrentPeriod() }
+            )
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+            // Scrollable Analytics Content
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = spacing.medium, vertical = spacing.medium),
+                verticalArrangement = Arrangement.spacedBy(spacing.large)
+            ) {
+                when (state.selectedTab) {
+                    AnalyticsTab.DAILY -> {
+                        state.dailyAnalytics?.let { data ->
+                            DailyAnalyticsContent(data, state)
+                        } ?: run {
+                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
                     }
-                }
-            } else if (state.selectedTab == AnalyticsTab.WEEKLY) {
-                state.weeklyAnalytics?.let { data ->
-                    WeeklyAnalyticsContent(data, state)
-                } ?: run {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                    AnalyticsTab.WEEKLY -> {
+                        state.weeklyAnalytics?.let { data ->
+                            WeeklyAnalyticsContent(data, state)
+                        } ?: run {
+                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
                     }
-                }
-            } else if (state.selectedTab == AnalyticsTab.MONTHLY) {
-                state.monthlyAnalytics?.let { data ->
-                    MonthlyAnalyticsContent(data, state)
-                } ?: run {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                    AnalyticsTab.MONTHLY -> {
+                        state.monthlyAnalytics?.let { data ->
+                            MonthlyAnalyticsContent(data, state)
+                        } ?: run {
+                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
                     }
                 }
             }
         }
     }
 }
+
+/**
+ * Period navigation bar allowing easy day/week/month navigation and jumping to current.
+ */
+@Composable
+private fun PeriodNavigationBar(
+    selectedTab: AnalyticsTab,
+    selectedDate: LocalDate,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onResetToday: () -> Unit
+) {
+    val isCurrent = remember(selectedTab, selectedDate) {
+        val today = LocalDate.now()
+        when (selectedTab) {
+            AnalyticsTab.DAILY -> selectedDate == today
+            AnalyticsTab.WEEKLY -> {
+                val weekStart = selectedDate.minusDays((selectedDate.dayOfWeek.value - 1).toLong())
+                val currentWeekStart = today.minusDays((today.dayOfWeek.value - 1).toLong())
+                weekStart == currentWeekStart
+            }
+            AnalyticsTab.MONTHLY -> selectedDate.year == today.year && selectedDate.month == today.month
+        }
+    }
+
+    val periodLabel = remember(selectedTab, selectedDate) {
+        when (selectedTab) {
+            AnalyticsTab.DAILY -> formatDateLabel(selectedDate)
+            AnalyticsTab.WEEKLY -> formatWeekLabel(selectedDate)
+            AnalyticsTab.MONTHLY -> formatMonthLabel(selectedDate)
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = spacing.small, vertical = spacing.extraSmall),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onPrevious) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Kỳ trước")
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.small)
+        ) {
+            Text(
+                text = periodLabel,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            if (!isCurrent) {
+                IconButton(
+                    onClick = onResetToday,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = "Về hiện tại",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+
+        IconButton(onClick = onNext) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Kỳ sau")
+        }
+    }
+}
+
+// ==========================================
+// DAILY ANALYTICS CONTENT
+// ==========================================
 
 @Composable
 fun DailyAnalyticsContent(data: DailyAnalytics, state: AnalyticsUiState) {
-    // Summary Ring Chart
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text("Efficiency Rate", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            
-            RingChart(
-                trackedDuration = data.trackedDuration.inWholeMilliseconds,
-                uniqueDuration = data.uniqueClockDuration.inWholeMilliseconds,
-                modifier = Modifier.fillMaxWidth(0.6f)
-            )
-            
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                MetricItem("Unique", formatDuration(data.uniqueClockDuration), MaterialTheme.colorScheme.primary)
-                MetricItem("Overlap", formatDuration(data.overlapDuration), MaterialTheme.colorScheme.error)
-            }
-        }
+    val hasData = data.trackedDuration.inWholeMilliseconds > 0
+
+    if (!hasData) {
+        AnalyticsEmptyStateCard(message = "Chưa có hoạt động nào được ghi nhận trong ngày này.")
+        return
     }
 
-    // Total Tracked Time Card
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Total Tracked", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text(formatDuration(data.trackedDuration), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
-        }
-    }
-
-    // Concurrency Distribution
-    Column {
-        Text(
-            "Concurrency Distribution", 
-            style = MaterialTheme.typography.titleMedium, 
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        
-        if (data.concurrencyDistribution.isEmpty()) {
-            Text(
-                "Chưa có dữ liệu phân bổ (No data)", 
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    data.concurrencyDistribution.forEach { (level, duration) ->
-                        val fraction = if (data.uniqueClockDuration.inWholeMilliseconds > 0) {
-                            duration.inWholeMilliseconds.toFloat() / data.uniqueClockDuration.inWholeMilliseconds
-                        } else 0f
-                        
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Level $level", fontWeight = FontWeight.Medium)
-                                Text(formatDuration(duration), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LinearProgressIndicator(
-                                progress = { fraction },
-                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                                color = if(level > 1) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Activity Breakdown
-    Column {
-        Text(
-            "Activity Breakdown", 
-            style = MaterialTheme.typography.titleMedium, 
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        
-        if (data.activityDurations.isEmpty()) {
-            Text(
-                "Chưa có dữ liệu (No data)", 
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    data.activityDurations.entries.sortedByDescending { it.value }.forEach { (activityId, duration) ->
-                        val activity = state.activities.find { it.id == activityId }
-                        val color = activity?.color?.let { androidx.compose.ui.graphics.Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary
-                        
-                        val fraction = if (data.trackedDuration.inWholeMilliseconds > 0) {
-                            duration.inWholeMilliseconds.toFloat() / data.trackedDuration.inWholeMilliseconds
-                        } else 0f
-                        
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(modifier = Modifier.size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(color))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(activity?.name ?: "Unknown", fontWeight = FontWeight.Medium)
-                                }
-                                Text(formatDuration(duration), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LinearProgressIndicator(
-                                progress = { fraction },
-                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                                color = color,
-                                trackColor = color.copy(alpha = 0.2f)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Spacer(modifier = Modifier.height(16.dp))
-    
-    // Relationships
-    RelationshipStats(
-        relationships = data.activityRelationships,
-        activities = state.activities,
-        modifier = Modifier.fillMaxWidth()
+    // 1. Overview Summary Cards (Tracked, Unique, Overlap)
+    TimeSummaryHeroCard(
+        title = "Tổng quan Ngày",
+        uniqueDuration = data.uniqueClockDuration,
+        trackedDuration = data.trackedDuration,
+        overlapDuration = data.overlapDuration
     )
-    
-    Spacer(modifier = Modifier.height(24.dp))
+
+    // 2. Concurrency Distribution
+    ConcurrencyDistributionCard(
+        concurrencyDistribution = data.concurrencyDistribution,
+        uniqueClockDuration = data.uniqueClockDuration
+    )
+
+    // 3. Activity Breakdown
+    ActivityBreakdownCard(
+        activityDurations = data.activityDurations,
+        totalDuration = data.trackedDuration,
+        activities = state.activities
+    )
+
+    // 4. Activity Relationships (Multitasking)
+    ActivityRelationshipsCard(
+        relationships = data.activityRelationships,
+        activities = state.activities
+    )
 }
+
+// ==========================================
+// WEEKLY ANALYTICS CONTENT
+// ==========================================
 
 @Composable
 fun WeeklyAnalyticsContent(data: WeeklyAnalytics, state: AnalyticsUiState) {
-    // Total Tracked Time Card
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Weekly Tracked", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text(formatDuration(data.totalTrackedDuration), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
-        }
+    val hasData = data.totalTrackedDuration.inWholeMilliseconds > 0
+
+    if (!hasData) {
+        AnalyticsEmptyStateCard(message = "Chưa có dữ liệu ghi nhận nào trong tuần này.")
+        return
     }
 
-    // Weekly Bar Chart
-    Column {
+    val overlapDuration = (data.totalTrackedDuration - data.totalUniqueDuration).coerceAtLeast(Duration.ZERO)
+
+    // 1. Overview Summary Cards
+    TimeSummaryHeroCard(
+        title = "Tổng quan Tuần",
+        uniqueDuration = data.totalUniqueDuration,
+        trackedDuration = data.totalTrackedDuration,
+        overlapDuration = overlapDuration,
+        averagePerDay = data.totalTrackedDuration / 7
+    )
+
+    // 2. Weekly Trend Bar Chart
+    LogAppCard(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "Weekly Trend", 
-            style = MaterialTheme.typography.titleMedium, 
+            text = "Xu hướng 7 Ngày (Weekly Trend)",
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
+            color = MaterialTheme.colorScheme.onSurface
         )
-        Card(
-            modifier = Modifier.fillMaxWidth().height(200.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) {
+        Text(
+            text = "Thời lượng ghi nhận theo từng ngày trong tuần",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(spacing.medium))
+
+        Box(modifier = Modifier.fillMaxWidth().height(180.dp)) {
             WeeklyBarChart(
                 dailyBreakdown = data.dailyBreakdown,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
 
-    // Activity Breakdown
-    Column {
-        Text(
-            "Activity Breakdown", 
-            style = MaterialTheme.typography.titleMedium, 
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        
-        if (data.activityDurations.isEmpty()) {
-            Text(
-                "Chưa có dữ liệu (No data)", 
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    data.activityDurations.entries.sortedByDescending { it.value }.forEach { (activityId, duration) ->
-                        val activity = state.activities.find { it.id == activityId }
-                        val color = activity?.color?.let { androidx.compose.ui.graphics.Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary
-                        
-                        val fraction = if (data.totalTrackedDuration.inWholeMilliseconds > 0) {
-                            duration.inWholeMilliseconds.toFloat() / data.totalTrackedDuration.inWholeMilliseconds
-                        } else 0f
-                        
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(modifier = Modifier.size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(color))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(activity?.name ?: "Unknown", fontWeight = FontWeight.Medium)
-                                }
-                                Text(formatDuration(duration), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LinearProgressIndicator(
-                                progress = { fraction },
-                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                                color = color,
-                                trackColor = color.copy(alpha = 0.2f)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-    Spacer(modifier = Modifier.height(16.dp))
-    
-    // Relationships
-    RelationshipStats(
-        relationships = data.activityRelationships,
-        activities = state.activities,
-        modifier = Modifier.fillMaxWidth()
+    // 3. Activity Breakdown
+    ActivityBreakdownCard(
+        activityDurations = data.activityDurations,
+        totalDuration = data.totalTrackedDuration,
+        activities = state.activities
     )
-    
-    Spacer(modifier = Modifier.height(24.dp))
+
+    // 4. Activity Relationships (Multitasking)
+    ActivityRelationshipsCard(
+        relationships = data.activityRelationships,
+        activities = state.activities
+    )
 }
+
+// ==========================================
+// MONTHLY ANALYTICS CONTENT
+// ==========================================
 
 @Composable
 fun MonthlyAnalyticsContent(data: MonthlyAnalytics, state: AnalyticsUiState) {
-    // Total Tracked Time Card
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-    ) {
-        Row(
-            modifier = Modifier.padding(20.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Monthly Tracked", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            Text(formatDuration(data.totalTrackedDuration), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
-        }
+    val hasData = data.totalTrackedDuration.inWholeMilliseconds > 0
+
+    if (!hasData) {
+        AnalyticsEmptyStateCard(message = "Chưa có dữ liệu ghi nhận nào trong tháng này.")
+        return
     }
 
-    // Monthly Heatmap
-    Column {
+    val overlapDuration = (data.totalTrackedDuration - data.totalUniqueDuration).coerceAtLeast(Duration.ZERO)
+    val daysInMonth = data.yearMonth.lengthOfMonth()
+
+    // 1. Overview Summary Cards
+    TimeSummaryHeroCard(
+        title = "Tổng quan Tháng",
+        uniqueDuration = data.totalUniqueDuration,
+        trackedDuration = data.totalTrackedDuration,
+        overlapDuration = overlapDuration,
+        averagePerDay = data.totalTrackedDuration / daysInMonth
+    )
+
+    // 2. Monthly Heatmap
+    LogAppCard(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "Monthly Heatmap", 
-            style = MaterialTheme.typography.titleMedium, 
+            text = "Bản đồ Nhiệt Tháng (Monthly Heatmap)",
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
+            color = MaterialTheme.colorScheme.onSurface
         )
-        Card(
-            modifier = Modifier.fillMaxWidth().height(260.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) {
+        Text(
+            text = "Mức độ hoạt động theo từng ngày trong tháng",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(spacing.medium))
+
+        Box(modifier = Modifier.fillMaxWidth().height(240.dp)) {
             MonthlyHeatmap(
                 yearMonth = data.yearMonth,
                 dailyBreakdown = data.dailyBreakdown,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.fillMaxSize()
             )
         }
     }
 
-    // Activity Breakdown
+    // 3. Activity Breakdown
+    ActivityBreakdownCard(
+        activityDurations = data.activityDurations,
+        totalDuration = data.totalTrackedDuration,
+        activities = state.activities
+    )
+
+    // 4. Activity Relationships (Multitasking)
+    ActivityRelationshipsCard(
+        relationships = data.activityRelationships,
+        activities = state.activities
+    )
+}
+
+// ==========================================
+// REUSABLE PRESENTATIONAL COMPONENTS
+// ==========================================
+
+/**
+ * Top Summary Hero Card showing Unique Time, Tracked Time, Overlap Time, and RingChart.
+ */
+@Composable
+private fun TimeSummaryHeroCard(
+    title: String,
+    uniqueDuration: Duration,
+    trackedDuration: Duration,
+    overlapDuration: Duration,
+    averagePerDay: Duration? = null
+) {
+    LogAppElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Tóm lược các chỉ số thời gian chính",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (overlapDuration.inWholeMinutes > 0) {
+                LogAppStatusBadge(
+                    status = StatusType.WARNING,
+                    text = "Đa nhiệm",
+                    icon = Icons.Default.Warning
+                )
+            } else {
+                LogAppStatusBadge(
+                    status = StatusType.SUCCESS,
+                    text = "Đơn nhiệm"
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(spacing.medium))
+
+        // RingChart & Hero metrics
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(0.9f)
+                    .height(130.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                RingChart(
+                    trackedDuration = trackedDuration.inWholeMilliseconds,
+                    uniqueDuration = uniqueDuration.inWholeMilliseconds,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1.1f)
+                    .padding(start = spacing.small),
+                verticalArrangement = Arrangement.spacedBy(spacing.small)
+            ) {
+                MetricRow(
+                    label = "Thời gian thực (Unique)",
+                    value = formatDurationFriendly(uniqueDuration),
+                    color = MaterialTheme.colorScheme.primary,
+                    caption = "Thời gian trôi qua thực tế"
+                )
+                MetricRow(
+                    label = "Tổng ghi nhận (Tracked)",
+                    value = formatDurationFriendly(trackedDuration),
+                    color = MaterialTheme.colorScheme.secondary,
+                    caption = "Tích lũy các phiên"
+                )
+                MetricRow(
+                    label = "Trùng lặp (Overlap)",
+                    value = formatDurationFriendly(overlapDuration),
+                    color = if (overlapDuration.inWholeMinutes > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
+                    caption = "Thời gian làm song song"
+                )
+            }
+        }
+
+        if (averagePerDay != null) {
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = spacing.small),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Trung bình mỗi ngày:",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = formatDurationFriendly(averagePerDay),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricRow(
+    label: String,
+    value: String,
+    color: Color,
+    caption: String
+) {
     Column {
-        Text(
-            "Activity Breakdown", 
-            style = MaterialTheme.typography.titleMedium, 
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        
-        if (data.activityDurations.isEmpty()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(color)
+            )
             Text(
-                "Chưa có dữ liệu (No data)", 
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(start = 14.dp)
+        )
+    }
+}
+
+/**
+ * Concurrency Distribution breakdown card (Single-task vs Multi-task levels).
+ */
+@Composable
+private fun ConcurrencyDistributionCard(
+    concurrencyDistribution: Map<Int, Duration>,
+    uniqueClockDuration: Duration
+) {
+    LogAppCard(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Phân bổ Mức độ Đồng thời (Concurrency)",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = "Mức độ tập trung đơn nhiệm so với làm việc đa nhiệm",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(spacing.medium))
+
+        if (concurrencyDistribution.isEmpty()) {
+            Text(
+                text = "Chưa có dữ liệu phân bổ.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    data.activityDurations.entries.sortedByDescending { it.value }.forEach { (activityId, duration) ->
-                        val activity = state.activities.find { it.id == activityId }
-                        val color = activity?.color?.let { androidx.compose.ui.graphics.Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary
-                        
-                        val fraction = if (data.totalTrackedDuration.inWholeMilliseconds > 0) {
-                            duration.inWholeMilliseconds.toFloat() / data.totalTrackedDuration.inWholeMilliseconds
-                        } else 0f
-                        
-                        Column {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(modifier = Modifier.size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(color))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(activity?.name ?: "Unknown", fontWeight = FontWeight.Medium)
-                                }
-                                Text(formatDuration(duration), color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LinearProgressIndicator(
-                                progress = { fraction },
-                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                                color = color,
-                                trackColor = color.copy(alpha = 0.2f)
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
+                concurrencyDistribution.entries.sortedBy { it.key }.forEach { (level, duration) ->
+                    val fraction = if (uniqueClockDuration.inWholeMilliseconds > 0) {
+                        duration.inWholeMilliseconds.toFloat() / uniqueClockDuration.inWholeMilliseconds
+                    } else 0f
+                    val percentage = (fraction * 100).toInt()
+
+                    val levelName = when (level) {
+                        1 -> "Mức 1: Đơn nhiệm (1 việc)"
+                        2 -> "Mức 2: Song song 2 việc"
+                        else -> "Mức $level: Song song $level việc"
+                    }
+                    val levelColor = if (level == 1) MaterialTheme.colorScheme.primary else Color(0xFFFF9800)
+
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = levelName,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "${formatDurationFriendly(duration)} ($percentage%)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = levelColor
                             )
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = levelColor,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     }
                 }
             }
         }
     }
-    
-    Spacer(modifier = Modifier.height(16.dp))
-    
-    // Relationships
-    RelationshipStats(
-        relationships = data.activityRelationships,
-        activities = state.activities,
-        modifier = Modifier.fillMaxWidth()
-    )
-    
-    Spacer(modifier = Modifier.height(24.dp))
 }
 
+/**
+ * Activity Breakdown card with custom color progress bars and percentages.
+ */
 @Composable
-fun MetricItem(label: String, value: String, color: androidx.compose.ui.graphics.Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(8.dp).clip(androidx.compose.foundation.shape.CircleShape).background(color))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(label, style = MaterialTheme.typography.labelMedium)
+private fun ActivityBreakdownCard(
+    activityDurations: Map<String, Duration>,
+    totalDuration: Duration,
+    activities: List<ActivityEntity>
+) {
+    LogAppCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Phân bổ theo Hoạt động",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Xếp hạng hoạt động chiếm nhiều thời gian nhất",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = "${activityDurations.size} hoạt động",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
-        Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+
+        Spacer(modifier = Modifier.height(spacing.medium))
+
+        if (activityDurations.isEmpty()) {
+            Text(
+                text = "Chưa có hoạt động nào trong kỳ này.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.medium)) {
+                activityDurations.entries.sortedByDescending { it.value }.forEach { (activityId, duration) ->
+                    val activity = activities.find { it.id == activityId }
+                    val color = activity?.color?.let { Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary
+                    val fraction = if (totalDuration.inWholeMilliseconds > 0) {
+                        duration.inWholeMilliseconds.toFloat() / totalDuration.inWholeMilliseconds
+                    } else 0f
+                    val percentage = (fraction * 100).toInt()
+
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(spacing.small),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                )
+                                Text(
+                                    text = activity?.name ?: "Chưa đặt tên",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
+                                )
+                            }
+
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(spacing.small),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "$percentage%",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = formatDurationFriendly(duration),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { fraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = color,
+                            trackColor = color.copy(alpha = 0.2f)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
-private fun formatDuration(duration: Duration): String {
-    duration.toComponents { hours, minutes, seconds, _ ->
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+/**
+ * Activity Relationships card separating Multitasking analysis from raw data.
+ */
+@Composable
+private fun ActivityRelationshipsCard(
+    relationships: Map<Pair<String, String>, Duration>,
+    activities: List<ActivityEntity>
+) {
+    LogAppCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
+            Text(
+                text = "Hoạt động Song song (Relationships)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "Các cặp hoạt động bạn thường xuyên thực hiện cùng một lúc",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.height(spacing.medium))
+
+        RelationshipStats(
+            relationships = relationships,
+            activities = activities,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+/**
+ * Empty state card when there are no analytics in the current period.
+ */
+@Composable
+private fun AnalyticsEmptyStateCard(message: String) {
+    LogAppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = spacing.medium)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(spacing.small),
+            modifier = Modifier.fillMaxWidth().padding(spacing.medium)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(48.dp)
+            )
+            Text(
+                text = "Chưa có dữ liệu phân tích",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = spacing.small)
+            )
+        }
+    }
+}
+
+// ==========================================
+// FORMATTING HELPERS
+// ==========================================
+
+private fun formatDateLabel(date: LocalDate): String {
+    val today = LocalDate.now()
+    return when (date) {
+        today -> "Hôm nay (${date.format(DateTimeFormatter.ofPattern("dd/MM"))})"
+        today.minusDays(1) -> "Hôm qua (${date.format(DateTimeFormatter.ofPattern("dd/MM"))})"
+        today.plusDays(1) -> "Ngày mai (${date.format(DateTimeFormatter.ofPattern("dd/MM"))})"
+        else -> date.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+    }
+}
+
+private fun formatWeekLabel(date: LocalDate): String {
+    val weekStart = date.minusDays((date.dayOfWeek.value - 1).toLong())
+    val weekEnd = weekStart.plusDays(6)
+    val startStr = weekStart.format(DateTimeFormatter.ofPattern("dd/MM"))
+    val endStr = weekEnd.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+    return "Tuần $startStr - $endStr"
+}
+
+private fun formatMonthLabel(date: LocalDate): String {
+    return "Tháng ${date.format(DateTimeFormatter.ofPattern("MM/yyyy"))}"
+}
+
+private fun formatDurationFriendly(duration: Duration): String {
+    val totalMinutes = duration.inWholeMinutes
+    if (totalMinutes <= 0) return "0p"
+    val hours = totalMinutes / 60
+    val minutes = totalMinutes % 60
+    return if (hours > 0) {
+        if (minutes > 0) "${hours}h ${minutes}p" else "${hours}h"
+    } else {
+        "${minutes}p"
     }
 }

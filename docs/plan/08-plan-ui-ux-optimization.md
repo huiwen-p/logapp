@@ -65,22 +65,91 @@ Các phase của Plan này có thể và nên được thực thi **song song** 
   - Chuẩn hóa toàn bộ `SessionBottomSheet` và `CreateSessionBottomSheet` theo Design System tokens (`LogAppBottomSheetHeader`, `LogAppPrimaryButton`, `LogAppSecondaryButton`, `LogAppDangerButton`, `LogAppConfirmDialog`).
 
 ### Phase 4: Analytics UX (Information Hierarchy)
+
+**Status:** `DONE`
+
 **Objective:** Người dùng đọc bảng phân tích và hiểu kết quả trong vài giây.
-- Thiết kế hệ thống tab Day / Week / Month.
-- Tóm lược (Summary Card): Hiển thị Unique time, Overlap, Tracked time rõ ràng ngay đầu.
-- Cấu trúc "Activity Breakdown" với thanh Progress Bar (ai chiếm nhiều % time nhất).
-- Rành mạch giữa "Số liệu thô" và "Phân tích Activity Relationships".
+- **Hệ thống Tab & Điều hướng Thời gian (Day / Week / Month Navigation):**
+  - Hỗ trợ đầy đủ bộ điều hướng thời gian đa chiều: `< Hôm nay (11/10) >`, `< Tuần dd/MM - dd/MM >`, `< Tháng MM/yyyy >`.
+  - Nút bấm quay về kỳ hiện tại tức thì (`resetToCurrentPeriod()`).
+  - Hỗ trợ chuyển đổi mượt mà giữa các tab Ngày, Tuần, Tháng.
+- **Tóm lược Đỉnh cao (Time Summary Hero Cards):**
+  - Bộ 3 chỉ số cốt lõi được trực quan hóa ngay đầu màn hình: **Thời gian thực (Unique Clock Time)**, **Tổng ghi nhận (Tracked Time)**, **Thời gian Trùng lặp (Overlap Time)**.
+  - Biểu đồ vành khuyên [RingChart] kết hợp huy hiệu [LogAppStatusBadge] phân loại rõ ràng trạng thái "Đơn nhiệm" vs "Đa nhiệm".
+  - Hiển thị chỉ số trung bình ngày (`Avg/ngày`) cho kỳ Tuần và Tháng.
+- **Phân bổ Mức độ Đồng thời (Concurrency Distribution):**
+  - Tách bạch rõ rệt giữa thời gian làm việc đơn nhiệm (Mức 1) và đa nhiệm (Mức 2+).
+- **Phân bổ Hoạt động (Activity Breakdown) chuẩn chỉnh:**
+  - Sắp xếp giảm dần theo thời lượng; hiển thị tỷ lệ phần trăm chính xác (`%`), tên hoạt động, thời gian thân thiện (`Xh Yp`).
+  - Thanh tiến trình `LinearProgressIndicator` mang màu sắc đặc trưng riêng của từng Activity.
+- **Tách bạch Mối quan hệ Hoạt động (Activity Relationships):**
+  - Khu vực riêng biệt phân tích sâu hiện tượng làm việc song song giữa các cặp hoạt động (`A + B`) kèm tỷ lệ đóng góp trong tổng thời gian overlap.
+- **Xử lý Empty State trang nhã:**
+  - Tự động hiển thị `AnalyticsEmptyStateCard` khi một ngày/tuần/tháng chưa có dữ liệu ghi nhận.
 
 ### Phase 5: Activity Management UX
-**Objective:** Quản lý vòng đời Activity.
-- Tối ưu UX cho Create, Edit (đổi màu/icon), Archive.
-- Tìm kiếm (Search) nếu user có >30 activities.
-- Thay đổi thứ tự (Reorder) trên list.
+
+**Status:** `DONE`
+
+**Objective:** Quản lý vòng đời Activity toàn diện, trực quan và an toàn dữ liệu.
+- **Vòng đời Activity (Create, Edit, Archive, Safe Delete):**
+  - **Tạo & Chỉnh sửa Hoạt động (`ActivityFormBottomSheet`):**
+    - Hỗ trợ thẻ xem trước trực quan (`LiveActivityPreview`) cập nhật thời gian thực màu sắc, biểu tượng và tên hiển thị.
+    - Kiểm tra tính hợp lệ tên hoạt động trong thời gian thực: cảnh báo lỗi khi tên rỗng hoặc trùng lặp với hoạt động khác (case-insensitive).
+    - Chuẩn hóa toàn bộ nút hành động theo Design System: [LogAppPrimaryButton], [LogAppSecondaryButton], [LogAppDangerButton].
+  - **Quy tắc Lưu trữ (Archive) & Bảo toàn dữ liệu theo SRS:**
+    - Lưu trữ (Archive) hoạt động: Ẩn khỏi màn hình chính và Quick Tracking, bảo toàn 100% lịch sử trong Nhật ký (Timeline) và Thống kê (Analytics).
+    - Khôi phục (Unarchive) hoạt động: Đưa hoạt động trở lại danh sách theo dõi nhanh chỉ với 1 thao tác.
+    - Hộp thoại xác nhận an toàn [LogAppConfirmDialog] với thông điệp rõ ràng, giải thích tác động khi Lưu trữ và Khôi phục.
+    - **Xóa cứng (Hard Delete) an toàn:** Tích hợp [DeleteActivityUseCase] và kiểm tra số lượng session trong lịch sử. Nếu hoạt động đã có session $\ge 1$, hệ thống ngăn chặn xóa cứng và chủ động hướng dẫn người dùng chuyển sang Lưu trữ (Archive). Nếu chưa có session nào, cho phép xóa vĩnh viễn sau khi xác nhận qua dialog cảnh báo màu đỏ.
+- **Tìm kiếm thời gian thực (Real-time Search):**
+  - Thanh tìm kiếm thông minh (`OutlinedTextField`) hỗ trợ lọc tức thì theo tên hoạt động khi người dùng có nhiều hoạt động (>10-30 hoạt động).
+  - Nút xóa bộ lọc nhanh (`Clear trailing icon`) và chuyển đổi mượt mà giữa các tab.
+  - Card giao diện rỗng chuyên dụng (`EmptySearchResultCard`) khi không có kết quả khớp với từ khóa tìm kiếm.
+- **Thay đổi thứ tự (Reorderable List) với kéo thả mượt mà:**
+  - Tích hợp thư viện `reorderable` với biểu tượng tay nắm kéo trực quan (`Icons.Default.Menu`) cho từng hoạt động ở tab "Đang theo dõi".
+  - Hiệu ứng đổ bóng nâng cao (`elevation = 8.dp`) và tô màu nổi bật khi người dùng đang kéo thả item.
+  - Banner hướng dẫn tinh tế: "Nhấn giữ biểu tượng ☰ để kéo thả sắp xếp thứ tự hiển thị".
+  - Tự động tạm tắt chế độ kéo thả khi đang tìm kiếm để tránh sai lệch chỉ mục hiển thị.
+  - Tự động cập nhật `sortOrder` xuống cơ sở dữ liệu Room ngay khi kết thúc thao tác kéo.
+- **Hệ thống Màu sắc & Biểu tượng Tuyển chọn (`ActivityPresets`):**
+  - Bảng màu 16 sắc thái Material 3 / pastel rực rỡ, trang nhã, tương phản tốt trên cả giao diện Sáng (Light) và Tối (Dark).
+  - Bộ 18 biểu tượng / emoji thân thiện đại diện cho các lĩnh vực đời sống (Lập trình, Công việc, Sách/Học tập, Gym/Thể thao, Game, Cà phê, Ngủ, v.v.) kèm tùy chọn chữ cái đầu.
+  - Hỗ trợ hiển thị icon/emoji đồng bộ trên cả [ActivityCard] và [ActiveSessionItem] ở màn hình chính.
+- **Phân tách Tab & Huy hiệu Đếm số lượng:**
+  - Tab "Đang theo dõi" và "Đã lưu trữ" đi kèm huy hiệu [LogAppStatusBadge] thể hiện số lượng chính xác theo thời gian thực.
+  - Xử lý trạng thái rỗng (`EmptyActiveActivitiesCard`, `EmptyArchivedActivitiesCard`) giải thích rõ ràng và có nút tạo mới ngay tức thì.
+- **Bộ Unit Tests hoàn chỉnh (`ManageActivitiesViewModelTest`):**
+  - Kiểm thử phân tách active vs archived, tìm kiếm thời gian thực, validation tên (trùng/rỗng), tạo mới, cập nhật, reorder thứ tự, chặn xóa khi có session, và xóa khi 0 session.
 
 ### Phase 6: Export / Backup / Sync State UX
-**Objective:** Trực quan hóa trạng thái an toàn dữ liệu để người dùng an tâm.
-- Màn hình Backup: Ghi rõ "Last backup: Today 02:00" với biểu tượng đám mây. Trạng thái Đang backup, Thành công, Lỗi.
-- Màn hình Sync: Icon "Đang đồng bộ", "Offline", "Xung đột dữ liệu". Báo rõ cho user nếu Firebase đẩy lỗi.
+
+**Status:** `DONE`
+
+**Objective:** Trực quan hóa trạng thái an toàn dữ liệu theo triết lý Offline-first, sẵn sàng kết nối đám mây trong tương lai (kiến trúc mở, không đi vào đường cụt).
+- **Trực quan hóa Trạng thái An toàn Dữ liệu & Đám mây (Data Safety State Machine):**
+  - **Firebase Cloud Sync Card:**
+    - Trực quan hóa chế độ hoạt động hiện tại: Huy hiệu [LogAppStatusBadge] `Chế độ Cục bộ (Local Only)` giải thích rõ ràng toàn bộ dữ liệu đang nằm an toàn 100% trong SQLite/Room trên thiết bị.
+    - Hiển thị chỉ số thay đổi cục bộ sẵn sàng đồng bộ: `$pendingSyncCount bản ghi sẵn sàng`.
+    - Kiến trúc mở: Bắt nguồn trực tiếp từ [SyncMetadataRepository] và [SyncWorker]. Khi sau này kích hoạt Firebase credentials, State machine tự động chuyển sang `Syncing` -> `Synced` mà không cần sửa đổi giao diện.
+  - **Google Drive Backup Card:**
+    - Trực quan hóa thời gian sao lưu: `"Bản sao lưu gần nhất: Hôm nay 14:30"` (hoặc ngày/giờ cụ thể) đi kèm biểu tượng đám mây theo đúng mục tiêu SRS.
+    - Trạng thái chưa kết nối: Huy hiệu `Chưa liên kết`, hiển thị thông điệp an tâm và nút "Liên kết tài khoản Google Drive" gắn trực tiếp với OAuth launcher.
+    - Trạng thái đã kết nối: Hiển thị email tài khoản, nút "Sao lưu ngay" (có vòng xoay tiến trình khi đang backup), nút "Khôi phục" (mở danh sách file sao lưu trên Drive để tải về), cài đặt tự động sao lưu định kỳ (Hàng ngày/Hàng tuần, số bản lưu giữ), và nút ngắt kết nối an toàn.
+- **Trải nghiệm Xuất / Nhập Tệp Ngoại tuyến Hoàn chỉnh (Local Export & Import Hub):**
+  - **Thẻ Xuất Dữ liệu (Local Export):**
+    - Xuất JSON: Sao lưu đầy đủ cấu trúc thực thể và quan hệ để khôi phục bất kỳ lúc nào. Tên file tự sinh theo timestamp `timelens_backup_yyyyMMdd_HHmmss.json`.
+    - Xuất CSV: Định dạng bảng tính chuẩn để mở trên Excel / Google Sheets phục vụ phân tích cá nhân.
+  - **Hộp thoại Xem trước khi Nhập (`ImportPreviewDialog`):**
+    - Quét và kiểm tra định dạng tệp JSON, hiển thị thẻ thống kê tổng quan: Số hoạt động (Activities) và Số phiên ghi nhận (Sessions).
+    - Bộ chọn chiến lược nhập dữ liệu rõ ràng:
+      - **Gộp dữ liệu (Merge - Khuyên dùng):** Bổ sung dữ liệu mới, giữ nguyên 100% dữ liệu đang có trên máy.
+      - **Ghi đè toàn bộ (Replace - Cảnh báo nguy hiểm):** Hộp thoại xác nhận lần 2 ([LogAppConfirmDialog]) cảnh báo xóa dữ liệu cũ trước khi thực hiện để đảm bảo an toàn tuyệt đối.
+  - **Thanh phản hồi nhanh (Snackbar):** Thông báo trạng thái ngay sau khi xuất/nhập thành công kèm số lượng bản ghi cụ thể.
+- **Tình trạng Sức khỏe Dữ liệu (Data Health & Self-Healing):**
+  - Quét Room DB cục bộ, báo cáo tính toàn vẹn (Orphan sessions, Timestamps nhất quán), tích hợp nút "Tự động sửa lỗi dữ liệu (Self-Healing)".
+- **Bộ Unit Tests hoàn chỉnh (`SettingsViewModelTest`):**
+  - Đã cập nhật và bổ sung các ca kiểm thử cho `pendingSyncCount`, `lastBackupTime`, `lastBackupTimeFormatted`, `refreshPendingSyncs`, và Data Health.
 
 ### Phase 7: Loading / Error / Empty / Offline States
 **Objective:** Mọi màn hình phải có state model đầy đủ (Stateful UI).

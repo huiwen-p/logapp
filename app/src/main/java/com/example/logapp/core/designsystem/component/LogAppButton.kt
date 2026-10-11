@@ -81,6 +81,7 @@ fun LogAppSecondaryButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    isLoading: Boolean = false,
     icon: ImageVector? = null
 ) {
     OutlinedButton(
@@ -88,22 +89,30 @@ fun LogAppSecondaryButton(
         modifier = modifier
             .fillMaxWidth()
             .height(52.dp),
-        enabled = enabled,
+        enabled = enabled && !isLoading,
         shape = RoundedCornerShape(16.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) {
-                androidx.compose.material3.Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(spacing.small))
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 2.dp
             )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (icon != null) {
+                    androidx.compose.material3.Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(spacing.small))
+                }
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                )
+            }
         }
     }
 }

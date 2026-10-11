@@ -43,6 +43,7 @@ class SettingsViewModelTest {
     private lateinit var driveBackupUseCase: com.example.logapp.domain.usecase.DriveBackupUseCase
     private lateinit var checkDataHealthUseCase: com.example.logapp.domain.usecase.CheckDataHealthUseCase
     private lateinit var repairDataHealthUseCase: com.example.logapp.domain.usecase.RepairDataHealthUseCase
+    private lateinit var syncMetadataRepository: com.example.logapp.domain.repository.SyncMetadataRepository
 
     private lateinit var viewModel: SettingsViewModel
 
@@ -60,6 +61,7 @@ class SettingsViewModelTest {
             every { autoBackupEnabled } returns flowOf(false)
             every { backupFrequency } returns flowOf("daily")
             every { backupKeepCount } returns flowOf(7)
+            every { lastBackupTime } returns flowOf(null)
         }
         googleAuthRepository = mockk(relaxed = true) {
             every { isSignedIn() } returns true
@@ -71,6 +73,9 @@ class SettingsViewModelTest {
         driveBackupUseCase = mockk(relaxed = true)
         checkDataHealthUseCase = mockk(relaxed = true)
         repairDataHealthUseCase = mockk(relaxed = true)
+        syncMetadataRepository = mockk(relaxed = true) {
+            coEvery { getPendingSyncs() } returns emptyList()
+        }
 
         viewModel = SettingsViewModel(
             preferencesManager,
@@ -80,7 +85,8 @@ class SettingsViewModelTest {
             driveBackupManager,
             driveBackupUseCase,
             checkDataHealthUseCase,
-            repairDataHealthUseCase
+            repairDataHealthUseCase,
+            syncMetadataRepository
         )
     }
 
@@ -189,5 +195,24 @@ class SettingsViewModelTest {
         io.mockk.coVerify { repairDataHealthUseCase() }
         assertEquals(repairedReport, viewModel.dataHealthReport.value)
         assertEquals(false, viewModel.isRepairingHealth.value)
+    }
+
+    @Test
+    fun `refreshPendingSyncs queries syncMetadataRepository and updates count`() = runTest(testDispatcher) {
+        val dummyMetadata = listOf(
+            com.example.logapp.data.local.entity.SyncMetadataEntity(
+                entityId = "1",
+                entityType = "ACTIVITY",
+                operation = "INSERT",
+                localVersion = 1,
+                syncStatus = com.example.logapp.data.local.entity.SyncStatus.PENDING
+            )
+        )
+        coEvery { syncMetadataRepository.getPendingSyncs() } returns dummyMetadata
+
+        viewModel.refreshPendingSyncs()
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.pendingSyncCount.value)
     }
 }
