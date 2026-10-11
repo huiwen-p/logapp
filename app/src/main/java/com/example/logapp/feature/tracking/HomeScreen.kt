@@ -29,11 +29,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.logapp.core.designsystem.component.LogAppElevatedCard
+import com.example.logapp.core.designsystem.component.LogAppEmptyState
+import com.example.logapp.core.designsystem.component.LogAppErrorState
+import com.example.logapp.core.designsystem.component.LogAppOfflineBanner
 import com.example.logapp.core.designsystem.component.LogAppPrimaryButton
 import com.example.logapp.core.designsystem.component.LogAppSecondaryButton
 import com.example.logapp.core.designsystem.component.LogAppSectionHeader
 import com.example.logapp.core.designsystem.component.LogAppSnackbarHost
 import com.example.logapp.core.designsystem.component.LogAppStatusBadge
+import com.example.logapp.core.designsystem.component.SkeletonActivityGrid
 import com.example.logapp.core.designsystem.component.StatusType
 import com.example.logapp.core.designsystem.tokens.spacing
 import com.example.logapp.data.local.entity.ActivitySessionEntity
@@ -53,6 +57,10 @@ fun HomeScreen(
     val filteredActivities by viewModel.filteredActivities.collectAsState()
     val activeSessions by viewModel.activeSessions.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val isOnline by viewModel.isOnline.collectAsState()
+    val todaySessionsCount by viewModel.todaySessionsCount.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -82,6 +90,19 @@ fun HomeScreen(
                 .padding(padding)
                 .padding(horizontal = spacing.medium)
         ) {
+            // 0. Offline Banner (reassures offline-first storage)
+            LogAppOfflineBanner(isOffline = !isOnline)
+
+            // 0.1 Error State with Retry
+            if (errorMessage != null) {
+                LogAppErrorState(
+                    title = "Không thể tải dữ liệu hoạt động",
+                    message = errorMessage ?: "Đã xảy ra lỗi không xác định.",
+                    onRetry = { viewModel.retry() },
+                    modifier = Modifier.padding(bottom = spacing.medium)
+                )
+            }
+
             // 1. Active Sessions Section
             AnimatedVisibility(
                 visible = activeSessions.isNotEmpty(),
@@ -134,6 +155,35 @@ fun HomeScreen(
                 }
             }
 
+            // 1.1 Motivating hint when user hasn't tracked anything today
+            if (activities.isNotEmpty() && activeSessions.isEmpty() && todaySessionsCount == 0 && !isLoading) {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = spacing.small)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = spacing.medium, vertical = spacing.small),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.small)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Bạn chưa ghi nhận hoạt động nào hôm nay. Chạm một hoạt động bên dưới để bắt đầu!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
             // 2. Quick Tracking Section Header
             LogAppSectionHeader(
                 title = "QUICK TRACKING",
@@ -164,8 +214,14 @@ fun HomeScreen(
                 )
             }
 
-            // 3. Grid / Empty States
-            if (activities.isEmpty()) {
+            // 3. Loading / Grid / Empty States
+            if (isLoading && activities.isEmpty()) {
+                // Loading Skeleton State
+                SkeletonActivityGrid(
+                    itemCount = 6,
+                    modifier = Modifier.weight(1f)
+                )
+            } else if (activities.isEmpty()) {
                 // Edge Case 1: Empty State - No activities created yet
                 Box(
                     modifier = Modifier
@@ -173,53 +229,16 @@ fun HomeScreen(
                         .fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    LogAppElevatedCard(
-                        modifier = Modifier.fillMaxWidth().padding(spacing.medium)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(spacing.small),
-                            modifier = Modifier.fillMaxWidth().padding(spacing.small)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.primaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(36.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(spacing.extraSmall))
-                            Text(
-                                text = "Bắt đầu ghi nhận thời gian",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "Tạo các hoạt động quen thuộc như Học tập, Làm việc, Đọc sách để bắt đầu quan sát bức tranh thực tế của bạn.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(spacing.small))
-                            LogAppPrimaryButton(
-                                text = "Tạo hoạt động mới",
-                                onClick = onNavigateToActivities,
-                                icon = Icons.Default.Add
-                            )
-                            LogAppSecondaryButton(
-                                text = "Thêm hoạt động mẫu",
-                                onClick = { viewModel.addSampleActivities() }
-                            )
-                        }
-                    }
+                    LogAppEmptyState(
+                        icon = Icons.Default.PlayArrow,
+                        title = "Bắt đầu ghi nhận thời gian",
+                        message = "Tạo các hoạt động quen thuộc như Học tập, Làm việc, Đọc sách để bắt đầu quan sát bức tranh thực tế của bạn.",
+                        primaryButtonText = "Tạo hoạt động mới",
+                        primaryButtonIcon = Icons.Default.Add,
+                        onPrimaryClick = onNavigateToActivities,
+                        secondaryButtonText = "Thêm hoạt động mẫu",
+                        onSecondaryClick = { viewModel.addSampleActivities() }
+                    )
                 }
             } else if (filteredActivities.isEmpty() && searchQuery.isNotBlank()) {
                 // Edge Case 2: Empty Search Result

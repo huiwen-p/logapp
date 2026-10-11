@@ -17,11 +17,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.logapp.core.designsystem.component.*
+import com.example.logapp.core.designsystem.component.LogAppEmptyState
+import com.example.logapp.core.designsystem.component.LogAppErrorState
+import com.example.logapp.core.designsystem.component.SkeletonTimeline
 import com.example.logapp.core.designsystem.tokens.spacing
 import com.example.logapp.data.local.entity.ActivityEntity
 import com.example.logapp.data.local.entity.ActivitySessionEntity
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlin.time.Duration
@@ -32,8 +36,16 @@ fun TimelineScreen(
     viewModel: TimelineViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
+    val userMessage by viewModel.userMessage.collectAsState()
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(userMessage) {
+        userMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearUserMessage()
+        }
+    }
 
     var selectedSession by remember { mutableStateOf<ActivitySessionEntity?>(null) }
     var showCreateSession by remember { mutableStateOf(false) }
@@ -212,61 +224,60 @@ fun TimelineScreen(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
-            // Timeline Canvas or Empty State
-            Box(modifier = Modifier.weight(1f)) {
-                com.example.logapp.feature.timeline.components.TimelineCanvas(
-                    selectedDate = state.selectedDate,
-                    sessions = state.sessions,
-                    activities = state.activities,
-                    onSessionClick = { session ->
-                        if (isMultiSelectMode) {
-                            if (selectedSessionIds.contains(session.id)) {
-                                selectedSessionIds = selectedSessionIds - session.id
-                                if (selectedSessionIds.isEmpty()) isMultiSelectMode = false
-                            } else {
-                                if (selectedSessionIds.size < 2) {
-                                    selectedSessionIds = selectedSessionIds + session.id
-                                }
-                            }
-                        } else {
-                            selectedSession = session
-                        }
-                    },
-                    onSessionLongClick = { session ->
-                        isMultiSelectMode = true
-                        selectedSessionIds = setOf(session.id)
-                    },
-                    selectedSessionIds = selectedSessionIds,
-                    modifier = Modifier.fillMaxSize()
+            // Error State
+            if (state.errorMessage != null) {
+                LogAppErrorState(
+                    title = "Không thể tải nhật ký",
+                    message = state.errorMessage ?: "Đã xảy ra lỗi không xác định.",
+                    onRetry = { viewModel.changeDate(0) },
+                    modifier = Modifier.padding(spacing.medium)
                 )
+            }
 
-                if (state.sessions.isEmpty()) {
-                    LogAppCard(
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = spacing.large)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(spacing.small),
-                            modifier = Modifier.fillMaxWidth().padding(spacing.small)
+            // Timeline Canvas, Loading Skeleton, or Empty State
+            Box(modifier = Modifier.weight(1f)) {
+                if (state.isLoading && state.sessions.isEmpty()) {
+                    SkeletonTimeline(modifier = Modifier.fillMaxSize())
+                } else {
+                    com.example.logapp.feature.timeline.components.TimelineCanvas(
+                        selectedDate = state.selectedDate,
+                        sessions = state.sessions,
+                        activities = state.activities,
+                        onSessionClick = { session ->
+                            if (isMultiSelectMode) {
+                                if (selectedSessionIds.contains(session.id)) {
+                                    selectedSessionIds = selectedSessionIds - session.id
+                                    if (selectedSessionIds.isEmpty()) isMultiSelectMode = false
+                                } else {
+                                    if (selectedSessionIds.size < 2) {
+                                        selectedSessionIds = selectedSessionIds + session.id
+                                    }
+                                }
+                            } else {
+                                selectedSession = session
+                            }
+                        },
+                        onSessionLongClick = { session ->
+                            isMultiSelectMode = true
+                            selectedSessionIds = setOf(session.id)
+                        },
+                        selectedSessionIds = selectedSessionIds,
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    if (state.sessions.isEmpty() && !state.isLoading) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .padding(horizontal = spacing.large)
                         ) {
-                            Text(
-                                text = "Chưa có phiên nhật ký nào",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Ngày này chưa có hoạt động nào được ghi nhận. Bạn có thể thêm thủ công hoặc bắt đầu ghi nhận từ màn hình Theo dõi.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = spacing.small)
-                            )
-                            Spacer(modifier = Modifier.height(spacing.extraSmall))
-                            LogAppPrimaryButton(
-                                text = "Thêm phiên thủ công",
-                                onClick = { showCreateSession = true }
+                            LogAppEmptyState(
+                                title = "Chưa có phiên nhật ký nào",
+                                message = "Ngày này chưa có hoạt động nào được ghi nhận. Bạn có thể thêm thủ công hoặc bắt đầu ghi nhận từ màn hình Theo dõi.",
+                                primaryButtonText = "Thêm phiên thủ công",
+                                onPrimaryClick = { showCreateSession = true },
+                                secondaryButtonText = if (state.selectedDate != LocalDate.now()) "Quay về Hôm nay" else null,
+                                onSecondaryClick = { viewModel.jumpToToday() }
                             )
                         }
                     }

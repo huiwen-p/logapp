@@ -32,7 +32,9 @@ data class AnalyticsUiState(
     val dailyAnalytics: DailyAnalytics? = null,
     val weeklyAnalytics: WeeklyAnalytics? = null,
     val monthlyAnalytics: MonthlyAnalytics? = null,
-    val activities: List<ActivityEntity> = emptyList()
+    val activities: List<ActivityEntity> = emptyList(),
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
@@ -52,49 +54,66 @@ class AnalyticsViewModel @Inject constructor(
         _selectedTab,
         _selectedDate
     ) { sessions, activities, boundaryStr, tab, date ->
-        val (hours, minutes) = PreferencesManager.parseDayBoundary(boundaryStr)
-        val zone = ZoneId.systemDefault()
-        val now = Instant.now()
-        
-        val startOfDay = date.atTime(hours, minutes).atZone(zone).toInstant()
-        val endOfDay = date.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
+        try {
+            val (hours, minutes) = PreferencesManager.parseDayBoundary(boundaryStr)
+            val zone = ZoneId.systemDefault()
+            val now = Instant.now()
+            
+            val startOfDay = date.atTime(hours, minutes).atZone(zone).toInstant()
+            val endOfDay = date.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
 
-        var dailyAnalytics: DailyAnalytics? = null
-        var weeklyAnalytics: WeeklyAnalytics? = null
-        var monthlyAnalytics: MonthlyAnalytics? = null
+            var dailyAnalytics: DailyAnalytics? = null
+            var weeklyAnalytics: WeeklyAnalytics? = null
+            var monthlyAnalytics: MonthlyAnalytics? = null
 
-        if (tab == AnalyticsTab.DAILY) {
-            dailyAnalytics = AnalyticsEngine.calculateDailyAnalytics(sessions, now, startOfDay, endOfDay)
-        } else if (tab == AnalyticsTab.WEEKLY) {
-            val weekStart = date.minusDays((date.dayOfWeek.value - 1).toLong()) // Monday
-            val boundaries = (0..6).associate { i ->
-                val day = weekStart.plusDays(i.toLong())
-                val dStart = day.atTime(hours, minutes).atZone(zone).toInstant()
-                val dEnd = day.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
-                day to Pair(dStart, dEnd)
+            if (tab == AnalyticsTab.DAILY) {
+                dailyAnalytics = AnalyticsEngine.calculateDailyAnalytics(sessions, now, startOfDay, endOfDay)
+            } else if (tab == AnalyticsTab.WEEKLY) {
+                val weekStart = date.minusDays((date.dayOfWeek.value - 1).toLong()) // Monday
+                val boundaries = (0..6).associate { i ->
+                    val day = weekStart.plusDays(i.toLong())
+                    val dStart = day.atTime(hours, minutes).atZone(zone).toInstant()
+                    val dEnd = day.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
+                    day to Pair(dStart, dEnd)
+                }
+                weeklyAnalytics = AnalyticsEngine.calculateWeeklyAnalytics(sessions, now, boundaries)
+            } else if (tab == AnalyticsTab.MONTHLY) {
+                val yearMonth = YearMonth.from(date)
+                val lengthOfMonth = yearMonth.lengthOfMonth()
+                val boundaries = (1..lengthOfMonth).associate { i ->
+                    val day = yearMonth.atDay(i)
+                    val dStart = day.atTime(hours, minutes).atZone(zone).toInstant()
+                    val dEnd = day.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
+                    day to Pair(dStart, dEnd)
+                }
+                monthlyAnalytics = AnalyticsEngine.calculateMonthlyAnalytics(sessions, now, yearMonth, boundaries)
             }
-            weeklyAnalytics = AnalyticsEngine.calculateWeeklyAnalytics(sessions, now, boundaries)
-        } else if (tab == AnalyticsTab.MONTHLY) {
-            val yearMonth = YearMonth.from(date)
-            val lengthOfMonth = yearMonth.lengthOfMonth()
-            val boundaries = (1..lengthOfMonth).associate { i ->
-                val day = yearMonth.atDay(i)
-                val dStart = day.atTime(hours, minutes).atZone(zone).toInstant()
-                val dEnd = day.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
-                day to Pair(dStart, dEnd)
-            }
-            monthlyAnalytics = AnalyticsEngine.calculateMonthlyAnalytics(sessions, now, yearMonth, boundaries)
+
+            AnalyticsUiState(
+                selectedTab = tab,
+                selectedDate = date,
+                dailyAnalytics = dailyAnalytics,
+                weeklyAnalytics = weeklyAnalytics,
+                monthlyAnalytics = monthlyAnalytics,
+                activities = activities,
+                isLoading = false,
+                errorMessage = null
+            )
+        } catch (e: Exception) {
+            AnalyticsUiState(
+                selectedTab = tab,
+                selectedDate = date,
+                activities = activities,
+                isLoading = false,
+                errorMessage = "Không thể tính toán thống kê: ${e.localizedMessage ?: "Lỗi hệ thống"}"
+            )
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AnalyticsUiState(isLoading = true))
 
-        AnalyticsUiState(
-            selectedTab = tab,
-            selectedDate = date,
-            dailyAnalytics = dailyAnalytics,
-            weeklyAnalytics = weeklyAnalytics,
-            monthlyAnalytics = monthlyAnalytics,
-            activities = activities
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AnalyticsUiState())
+    fun retry() {
+        val current = _selectedDate.value
+        _selectedDate.value = current
+    }
 
     fun setTab(tab: AnalyticsTab) {
         _selectedTab.update { tab }

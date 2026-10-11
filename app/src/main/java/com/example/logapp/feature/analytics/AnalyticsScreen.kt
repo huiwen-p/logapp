@@ -107,32 +107,30 @@ fun AnalyticsScreen(
                     .padding(horizontal = spacing.medium, vertical = spacing.medium),
                 verticalArrangement = Arrangement.spacedBy(spacing.large)
             ) {
-                when (state.selectedTab) {
-                    AnalyticsTab.DAILY -> {
-                        state.dailyAnalytics?.let { data ->
-                            DailyAnalyticsContent(data, state)
-                        } ?: run {
-                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
-                            }
+                if (state.errorMessage != null) {
+                    LogAppErrorState(
+                        title = "Không thể tính toán thống kê",
+                        message = state.errorMessage ?: "Đã xảy ra lỗi không xác định.",
+                        onRetry = { viewModel.retry() }
+                    )
+                } else if (state.isLoading) {
+                    SkeletonAnalytics()
+                } else {
+                    when (state.selectedTab) {
+                        AnalyticsTab.DAILY -> {
+                            state.dailyAnalytics?.let { data ->
+                                DailyAnalyticsContent(data, state)
+                            } ?: SkeletonAnalytics()
                         }
-                    }
-                    AnalyticsTab.WEEKLY -> {
-                        state.weeklyAnalytics?.let { data ->
-                            WeeklyAnalyticsContent(data, state)
-                        } ?: run {
-                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
-                            }
+                        AnalyticsTab.WEEKLY -> {
+                            state.weeklyAnalytics?.let { data ->
+                                WeeklyAnalyticsContent(data, state)
+                            } ?: SkeletonAnalytics()
                         }
-                    }
-                    AnalyticsTab.MONTHLY -> {
-                        state.monthlyAnalytics?.let { data ->
-                            MonthlyAnalyticsContent(data, state)
-                        } ?: run {
-                            Box(modifier = Modifier.fillMaxWidth().height(200.dp), contentAlignment = Alignment.Center) {
-                                CircularProgressIndicator()
-                            }
+                        AnalyticsTab.MONTHLY -> {
+                            state.monthlyAnalytics?.let { data ->
+                                MonthlyAnalyticsContent(data, state)
+                            } ?: SkeletonAnalytics()
                         }
                     }
                 }
@@ -770,36 +768,12 @@ private fun ActivityRelationshipsCard(
  */
 @Composable
 private fun AnalyticsEmptyStateCard(message: String) {
-    LogAppCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = spacing.medium)
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(spacing.small),
-            modifier = Modifier.fillMaxWidth().padding(spacing.medium)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Info,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.size(48.dp)
-            )
-            Text(
-                text = "Chưa có dữ liệu phân tích",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = spacing.small)
-            )
-        }
-    }
+    LogAppEmptyState(
+        icon = Icons.Default.Info,
+        title = "Chưa có dữ liệu phân tích",
+        message = message,
+        modifier = Modifier.padding(vertical = spacing.small)
+    )
 }
 
 // ==========================================

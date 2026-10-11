@@ -26,7 +26,9 @@ data class TimelineUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val sessions: List<ActivitySessionEntity> = emptyList(),
     val activities: List<ActivityEntity> = emptyList(),
-    val dailyAnalytics: DailyAnalytics? = null
+    val dailyAnalytics: DailyAnalytics? = null,
+    val isLoading: Boolean = false,
+    val errorMessage: String? = null
 )
 
 @HiltViewModel
@@ -42,6 +44,12 @@ class TimelineViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow(LocalDate.now())
+    private val _userMessage = MutableStateFlow<String?>(null)
+    val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
+
+    fun clearUserMessage() {
+        _userMessage.value = null
+    }
 
     val uiState: StateFlow<TimelineUiState> = combine(
         sessionRepository.getAllSessions(),
@@ -61,11 +69,26 @@ class TimelineViewModel @Inject constructor(
         }
 
         val analytics = AnalyticsEngine.calculateDailyAnalytics(dailySessions, Instant.now(), startOfDay, endOfDay)
-        TimelineUiState(date, dailySessions, activities, analytics)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TimelineUiState())
+        TimelineUiState(
+            selectedDate = date,
+            sessions = dailySessions,
+            activities = activities,
+            dailyAnalytics = analytics,
+            isLoading = false,
+            errorMessage = null
+        )
+    }
+    .catch { e ->
+        emit(TimelineUiState(selectedDate = _selectedDate.value, isLoading = false, errorMessage = "Lỗi tải dữ liệu: ${e.localizedMessage ?: "Lỗi hệ thống"}"))
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TimelineUiState(isLoading = true))
 
     fun changeDate(offsetDays: Long) {
         _selectedDate.value = _selectedDate.value.plusDays(offsetDays)
+    }
+
+    fun jumpToToday() {
+        _selectedDate.value = LocalDate.now()
     }
 
     fun editSession(session: ActivitySessionEntity, newStartedAt: Instant, newEndedAt: Instant?, newNote: String?) {
@@ -85,7 +108,7 @@ class TimelineViewModel @Inject constructor(
             try {
                 createManualSessionUseCase(activityId, startTime, endTime, note)
             } catch (e: Exception) {
-                // Ignore or handle UI error states if needed
+                _userMessage.value = "Không thể tạo phiên: ${e.localizedMessage ?: "Lỗi không xác định"}"
             }
         }
     }
@@ -95,7 +118,7 @@ class TimelineViewModel @Inject constructor(
             try {
                 splitSessionUseCase(session, splitAt)
             } catch (e: Exception) {
-                // Ignore or handle UI error states if needed
+                _userMessage.value = "Không thể chia phiên: ${e.localizedMessage ?: "Lỗi không xác định"}"
             }
         }
     }
@@ -105,7 +128,7 @@ class TimelineViewModel @Inject constructor(
             try {
                 mergeSessionUseCase(session1, session2)
             } catch (e: Exception) {
-                // Ignore or handle UI error states if needed
+                _userMessage.value = "Không thể gộp phiên: ${e.localizedMessage ?: "Lỗi không xác định"}"
             }
         }
     }

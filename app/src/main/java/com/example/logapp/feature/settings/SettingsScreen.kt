@@ -264,21 +264,29 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(spacing.small))
                         val isSuccess = msg.contains("thành công")
                         val isError = msg.contains("thất bại") || msg.contains("Lỗi")
-                        Surface(
-                            color = if (isSuccess) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                else if (isError) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f)
-                                else MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = msg,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isSuccess) MaterialTheme.colorScheme.onPrimaryContainer
-                                    else if (isError) MaterialTheme.colorScheme.onErrorContainer
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(spacing.small)
+                        
+                        if (isError) {
+                            LogAppErrorState(
+                                title = "Sao lưu Google Drive thất bại",
+                                message = msg,
+                                retryButtonText = "Thử lại (Retry)",
+                                onRetry = { viewModel.triggerBackupNow(context) }
                             )
+                        } else {
+                            Surface(
+                                color = if (isSuccess) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = msg,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isSuccess) MaterialTheme.colorScheme.onPrimaryContainer
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(spacing.small)
+                                )
+                            }
                         }
                     }
 
@@ -589,16 +597,25 @@ fun SettingsScreen(
             title = { Text("Bản sao lưu trên Google Drive") },
             text = {
                 if (isLoadingDriveBackups) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(spacing.medium),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(spacing.small)
                     ) {
-                        CircularProgressIndicator()
+                        repeat(3) {
+                            SkeletonBox(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                        }
                     }
                 } else if (driveBackups.isEmpty()) {
-                    Text("Không tìm thấy bản sao lưu nào trên tài khoản Google Drive này.")
+                    LogAppEmptyState(
+                        icon = Icons.Default.Info,
+                        title = "Chưa có bản sao lưu",
+                        message = "Không tìm thấy bản sao lưu nào của TimeLens trên tài khoản Google Drive này. Hãy bấm 'Sao lưu ngay' để tải bản sao lưu đầu tiên lên."
+                    )
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxWidth(),

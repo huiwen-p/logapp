@@ -33,11 +33,40 @@ class ManageActivitiesViewModel @Inject constructor(
     private val _operationEvent = MutableStateFlow<String?>(null)
     val operationEvent: StateFlow<String?> = _operationEvent.asStateFlow()
 
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    init {
+        loadData()
+    }
+
+    private fun loadData() {
+        _isLoading.value = true
+        _errorMessage.value = null
+        viewModelScope.launch {
+            try {
+                activityRepository.getAllActivities().collect {
+                    _isLoading.value = false
+                }
+            } catch (e: Exception) {
+                _isLoading.value = false
+                _errorMessage.value = "Không thể tải danh sách hoạt động: ${e.localizedMessage ?: "Lỗi hệ thống"}"
+            }
+        }
+    }
+
+    fun retry() {
+        loadData()
+    }
+
     val rawActivities: StateFlow<List<ActivityEntity>> = activityRepository.getAllActivities()
         .map { list -> list.sortedBy { it.sortOrder } }
         .stateIn(
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
+            started = SharingStarted.Eagerly,
             initialValue = emptyList()
         )
 
@@ -49,7 +78,7 @@ class ManageActivitiesViewModel @Inject constructor(
         else activeList.filter { it.name.contains(query.trim(), ignoreCase = true) }
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = emptyList()
     )
 
@@ -59,17 +88,17 @@ class ManageActivitiesViewModel @Inject constructor(
         else archivedList.filter { it.name.contains(query.trim(), ignoreCase = true) }
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
+        started = SharingStarted.Eagerly,
         initialValue = emptyList()
     )
 
     val activeCount: StateFlow<Int> = rawActivities
         .map { list -> list.count { !it.isArchived } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     val archivedCount: StateFlow<Int> = rawActivities
         .map { list -> list.count { it.isArchived } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     fun onSearchQueryChange(query: String) {
         _searchQuery.value = query

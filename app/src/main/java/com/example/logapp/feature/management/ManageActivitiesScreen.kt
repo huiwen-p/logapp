@@ -42,6 +42,8 @@ fun ManageActivitiesScreen(
     val activeCount by viewModel.activeCount.collectAsState()
     val archivedCount by viewModel.archivedCount.collectAsState()
     val operationEvent by viewModel.operationEvent.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -196,9 +198,25 @@ fun ManageActivitiesScreen(
                 }
             }
 
+            if (errorMessage != null) {
+                LogAppErrorState(
+                    title = "Không thể tải danh sách hoạt động",
+                    message = errorMessage ?: "Đã xảy ra lỗi không xác định.",
+                    onRetry = { viewModel.retry() },
+                    modifier = Modifier.padding(horizontal = spacing.medium, vertical = spacing.small)
+                )
+            }
+
             // Tab 0: Active Activities (Supports Reordering when search is empty)
             if (selectedTabIndex == 0) {
-                if (reorderableList.isEmpty()) {
+                if (isLoading && reorderableList.isEmpty()) {
+                    SkeletonActivityList(
+                        itemCount = 5,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(spacing.medium)
+                    )
+                } else if (reorderableList.isEmpty()) {
                     if (searchQuery.isNotBlank()) {
                         EmptySearchResultCard(
                             query = searchQuery,
@@ -308,7 +326,14 @@ fun ManageActivitiesScreen(
                 }
             } else {
                 // Tab 1: Archived Activities
-                if (archivedActivities.isEmpty()) {
+                if (isLoading && archivedActivities.isEmpty()) {
+                    SkeletonActivityList(
+                        itemCount = 3,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(spacing.medium)
+                    )
+                } else if (archivedActivities.isEmpty()) {
                     if (searchQuery.isNotBlank()) {
                         EmptySearchResultCard(
                             query = searchQuery,
@@ -594,36 +619,16 @@ private fun EmptySearchResultCard(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(spacing.large),
+            .padding(spacing.medium),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(spacing.medium)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Search,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-            Text(
-                text = "Không tìm thấy hoạt động \"$query\"",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "Kiểm tra lại từ khóa tìm kiếm hoặc bấm nút bên dưới để xem toàn bộ danh sách.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            LogAppSecondaryButton(
-                text = "Xem tất cả hoạt động",
-                onClick = onClearSearch
-            )
-        }
+        LogAppEmptyState(
+            icon = Icons.Default.Search,
+            title = "Không tìm thấy hoạt động \"$query\"",
+            message = "Kiểm tra lại từ khóa tìm kiếm hoặc bấm nút bên dưới để xem toàn bộ danh sách.",
+            secondaryButtonText = "Xem tất cả hoạt động",
+            onSecondaryClick = onClearSearch
+        )
     }
 }
 
@@ -634,37 +639,17 @@ private fun EmptyActiveActivitiesCard(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(spacing.large),
+            .padding(spacing.medium),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(spacing.medium)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
-            )
-            Text(
-                text = "Chưa có hoạt động đang theo dõi",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "Tạo các hoạt động quen thuộc của bạn (ví dụ: Lập trình, Học tập, Tập gym) để theo dõi thời gian dễ dàng chỉ với một chạm.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-            LogAppPrimaryButton(
-                text = "Tạo hoạt động mới",
-                onClick = onCreateNew,
-                icon = Icons.Default.Add
-            )
-        }
+        LogAppEmptyState(
+            icon = Icons.Default.Add,
+            title = "Chưa có hoạt động đang theo dõi",
+            message = "Tạo các hoạt động quen thuộc của bạn (ví dụ: Lập trình, Học tập, Tập gym) để theo dõi thời gian dễ dàng chỉ với một chạm.",
+            primaryButtonText = "Tạo hoạt động mới",
+            primaryButtonIcon = Icons.Default.Add,
+            onPrimaryClick = onCreateNew
+        )
     }
 }
 
@@ -673,31 +658,13 @@ private fun EmptyArchivedActivitiesCard() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(spacing.large),
+            .padding(spacing.medium),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(spacing.medium)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Info,
-                contentDescription = null,
-                modifier = Modifier.size(56.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-            )
-            Text(
-                text = "Chưa có hoạt động nào được lưu trữ",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                text = "Khi một hoạt động không còn thường xuyên sử dụng, bạn có thể Lưu trữ (Archive) nó để ẩn khỏi trang chủ mà vẫn giữ nguyên 100% lịch sử trong Nhật ký và Thống kê.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
+        LogAppEmptyState(
+            icon = Icons.Default.Info,
+            title = "Chưa có hoạt động nào được lưu trữ",
+            message = "Khi một hoạt động không còn thường xuyên sử dụng, bạn có thể Lưu trữ (Archive) nó để ẩn khỏi trang chủ mà vẫn giữ nguyên 100% lịch sử trong Nhật ký và Thống kê."
+        )
     }
 }

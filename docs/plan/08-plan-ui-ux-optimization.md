@@ -152,10 +152,49 @@ Các phase của Plan này có thể và nên được thực thi **song song** 
   - Đã cập nhật và bổ sung các ca kiểm thử cho `pendingSyncCount`, `lastBackupTime`, `lastBackupTimeFormatted`, `refreshPendingSyncs`, và Data Health.
 
 ### Phase 7: Loading / Error / Empty / Offline States
-**Objective:** Mọi màn hình phải có state model đầy đủ (Stateful UI).
-- Empty States: Ví dụ "Bạn chưa track gì hôm nay", thay vì màn hình trắng bóc.
-- Loading: Skeleton UI hoặc progress indicators khi tính toán Analytics lớn.
-- Error/Offline: Nút "Retry" nếu không kết nối được Firebase. 
+
+**Status:** `DONE`
+
+**Objective:** Mọi màn hình phải có state model đầy đủ (Stateful UI: Loading, Error, Empty, Offline).
+- **Design System Foundation cho Stateful UI (`core/designsystem/component/`):**
+  - [LogAppSkeleton.kt]: Hiệu ứng chuyển màu mượt mà (`shimmerEffect()`) chạy tuần hoàn theo trục nghiêng chuẩn Material 3. Cung cấp các bộ khung placeholder:
+    - `SkeletonActivityGrid`: Khung lưới hoạt động dạng ô vuông bo góc cho màn hình chính.
+    - `SkeletonAnalytics`: Khung phân tích toàn diện gồm thẻ Hero tổng quan, biểu đồ đồng thời và danh sách hoạt động.
+    - `SkeletonTimeline`: Khung thanh tóm tắt và các khối session của dòng thời gian.
+    - `SkeletonActivityList`: Khung danh sách hàng hoạt động cho trang quản lý.
+  - [LogAppEmptyState.kt]: Thành phần giao diện rỗng (Empty State) thống nhất: Icon/Illustration bo tròn trên nền màu container, Tiêu đề, Mô tả giải thích thân thiện, Nút hành động chính (Primary Action) và Nút phụ (Secondary Action).
+  - [LogAppErrorState.kt]: Thành phần giao diện lỗi (Error State): Icon cảnh báo màu semantic error, Thông điệp giải thích ngắn gọn, Nút "Thử lại" (Retry) kích hoạt gọi lại hàm logic.
+  - [LogAppOfflineBanner.kt]: Biểu ngữ thông báo ngoại tuyến có hiệu ứng trượt mượt mà (`AnimatedVisibility`), giải thích rõ ràng triết lý Offline-first: "Toàn bộ hoạt động và phiên được lưu trữ an toàn 100% trên thiết bị".
+- **Hạ tầng Giám sát Kết nối Mạng (`core/network/`):**
+  - Xây dựng [NetworkMonitor] và triển khai [ConnectivityNetworkMonitor] theo thời gian thực sử dụng `ConnectivityManager.NetworkCallback` và coroutine `callbackFlow`.
+  - Tích hợp Hilt Singleton qua [NetworkModule].
+- **Áp dụng Stateful UI cho toàn bộ các màn hình:**
+  - **Màn hình chính (Home / Tracking):**
+    - Biểu ngữ [LogAppOfflineBanner] hiển thị khi thiết bị ngoại tuyến.
+    - Trạng thái tải: Hiển thị `SkeletonActivityGrid` tránh giật nhấp nháy hoặc hiển thị vội trạng thái rỗng khi DB đang đọc.
+    - Trạng thái lỗi: Hiển thị [LogAppErrorState] với nút "Thử lại".
+    - Trạng thái rỗng ngày: Gợi ý tạo động lực khi chưa track phiên nào hôm nay: *"Bạn chưa ghi nhận hoạt động nào hôm nay. Chạm một hoạt động bên dưới để bắt đầu!"*
+    - Trạng thái chưa có hoạt động: Thẻ [LogAppEmptyState] kèm nút "+ Tạo hoạt động mới" và "Thêm hoạt động mẫu".
+  - **Nhật ký (Timeline):**
+    - Trạng thái tải: Hiển thị `SkeletonTimeline` khi chuyển ngày hoặc nạp dữ liệu.
+    - Trạng thái lỗi: Hiển thị [LogAppErrorState] với nút "Thử lại".
+    - Trạng thái rỗng: Hiển thị [LogAppEmptyState] với nút "+ Thêm phiên thủ công" và nút "Quay về Hôm nay".
+    - Phản hồi thao tác: Báo lỗi trực quan qua Snackbar khi chia (Split) hoặc gộp (Merge) phiên không hợp lệ.
+  - **Phân tích & Thống kê (Analytics):**
+    - Trạng thái tính toán: Hiển thị `SkeletonAnalytics` thay cho vòng xoay đơn điệu khi xử lý lượng lớn dữ liệu ngày/tuần/tháng.
+    - Trạng thái lỗi: Hiển thị [LogAppErrorState] với nút "Thử lại".
+    - Trạng thái rỗng: Chuẩn hóa [AnalyticsEmptyStateCard] sử dụng [LogAppEmptyState] cho Ngày, Tuần, Tháng.
+  - **Cài đặt & Sao lưu (Settings):**
+    - Trạng thái lỗi sao lưu Google Drive: Hiển thị thông báo lỗi rõ ràng đi kèm nút **[Thử lại (Retry)]** kích hoạt sao lưu tức thì (tuân thủ SRS #73).
+    - Hộp thoại bản sao lưu Google Drive: Hiển thị bộ khung shimmer khi đang nạp danh sách, và hiển thị [LogAppEmptyState] khi chưa có tệp sao lưu trên đám mây.
+  - **Quản lý hoạt động (Manage Activities):**
+    - Trạng thái tải: Hiển thị `SkeletonActivityList` trên cả tab "Đang theo dõi" và "Đã lưu trữ".
+    - Trạng thái lỗi: Hiển thị [LogAppErrorState] với nút "Thử lại".
+    - Trạng thái rỗng: Chuẩn hóa thẻ rỗng tìm kiếm, rỗng theo dõi và rỗng lưu trữ theo [LogAppEmptyState].
+- **Bộ Unit Tests hoàn chỉnh (`StatefulUiViewModelTest`):**
+  - Kiểm thử `isLoading`, `errorMessage`, `isOnline`, `retry`, `jumpToToday` cho tất cả các ViewModel.
+  - Sửa và chuẩn hóa các bài kiểm thử `DriveBackupUseCaseTest` và `ManageActivitiesViewModelTest`, đạt 100% tỷ lệ pass toàn bộ dự án (97/97 tests passed).
+
 
 ### Phase 8: UI Performance & Interaction
 **Objective:** Ứng dụng phản hồi ngay lập tức, cuộn mượt (60fps).

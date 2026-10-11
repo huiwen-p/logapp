@@ -49,10 +49,9 @@ class ManageActivitiesViewModelTest {
 
     @Test
     fun testActiveAndArchivedActivities_separatedCorrectly() = runTest {
-        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.activeActivities.collect {}
-            viewModel.archivedActivities.collect {}
-        }
+        backgroundScope.launch { viewModel.activeActivities.collect {} }
+        backgroundScope.launch { viewModel.archivedActivities.collect {} }
+        backgroundScope.launch { viewModel.rawActivities.collect {} }
 
         advanceUntilIdle()
 
@@ -65,16 +64,13 @@ class ManageActivitiesViewModelTest {
 
         assertEquals(2, viewModel.activeCount.value)
         assertEquals(1, viewModel.archivedCount.value)
-
-        collectJob.cancel()
     }
 
     @Test
     fun testSearchQuery_filtersActiveAndArchived() = runTest {
-        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.activeActivities.collect {}
-            viewModel.archivedActivities.collect {}
-        }
+        backgroundScope.launch { viewModel.activeActivities.collect {} }
+        backgroundScope.launch { viewModel.archivedActivities.collect {} }
+        backgroundScope.launch { viewModel.rawActivities.collect {} }
 
         advanceUntilIdle()
 
@@ -91,8 +87,6 @@ class ManageActivitiesViewModelTest {
         assertEquals(0, viewModel.activeActivities.value.size)
         assertEquals(1, viewModel.archivedActivities.value.size)
         assertEquals("Chơi game", viewModel.archivedActivities.value[0].name)
-
-        collectJob.cancel()
     }
 
     @Test
@@ -166,26 +160,21 @@ class ManageActivitiesViewModelTest {
 
     @Test
     fun testArchiveAndUnarchiveActivity() = runTest {
-        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.rawActivities.collect {}
-        }
+        backgroundScope.launch { viewModel.rawActivities.collect {} }
         advanceUntilIdle()
 
         viewModel.archiveActivity("1", archive = true)
         advanceUntilIdle()
 
-        val slot1 = slot<ActivityEntity>()
-        coVerify { activityRepository.updateActivity(capture(slot1)) }
-        assertTrue(slot1.captured.isArchived)
+        val capturedList = mutableListOf<ActivityEntity>()
+        coVerify { activityRepository.updateActivity(capture(capturedList)) }
+        assertTrue(capturedList.last().isArchived)
 
         viewModel.archiveActivity("3", archive = false)
         advanceUntilIdle()
 
-        val slot2 = slot<ActivityEntity>()
-        coVerify { activityRepository.updateActivity(capture(slot2)) }
-        assertFalse(slot2.captured.isArchived)
-
-        collectJob.cancel()
+        coVerify(atLeast = 2) { activityRepository.updateActivity(capture(capturedList)) }
+        assertFalse(capturedList.last().isArchived)
     }
 
     @Test

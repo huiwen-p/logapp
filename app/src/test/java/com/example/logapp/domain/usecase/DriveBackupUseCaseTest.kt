@@ -54,6 +54,7 @@ class DriveBackupUseCaseTest {
         every { googleAuthRepository.isSignedIn() } returns true
         coEvery { exportDataUseCase(ExportFormat.JSON) } returns "{\"test\": true}"
         coEvery { driveBackupManager.uploadBackupFile(any()) } returns Result.success("file-id-123")
+        coEvery { preferencesManager.setLastBackupTime(any()) } returns Unit
         every { preferencesManager.backupKeepCount } returns flowOf(7)
         coEvery { driveBackupManager.deleteOldBackups(7) } returns Result.success(Unit)
 
