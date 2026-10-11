@@ -13,6 +13,8 @@ class CsvGenerator @Inject constructor() {
         val activityMap = activities.associateBy { it.id }
         
         val builder = java.lang.StringBuilder()
+        // Add UTF-8 BOM for Excel compatibility
+        builder.append("\uFEFF")
         builder.append("Session ID,Activity Name,Start Time,End Time,Duration (Minutes),Note\n")
         
         for (session in sessions.filter { it.deletedAt == null }) {

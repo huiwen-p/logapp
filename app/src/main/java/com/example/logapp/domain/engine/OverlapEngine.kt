@@ -22,33 +22,41 @@ object OverlapEngine {
 
         if (validSessions.isEmpty()) return emptyList()
 
-        // Extract all boundary points
-        val points = mutableSetOf<Instant>()
-        validSessions.forEach {
-            points.add(it.startedAt)
-            points.add(it.endedAt!!)
+        val startsByTime = mutableMapOf<Instant, MutableList<ActivitySessionEntity>>()
+        val endsByTime = mutableMapOf<Instant, MutableList<ActivitySessionEntity>>()
+        val uniquePoints = java.util.TreeSet<Instant>()
+
+        for (session in validSessions) {
+            val start = session.startedAt
+            val end = session.endedAt!!
+            uniquePoints.add(start)
+            uniquePoints.add(end)
+            startsByTime.getOrPut(start) { mutableListOf() }.add(session)
+            endsByTime.getOrPut(end) { mutableListOf() }.add(session)
         }
 
-        val sortedPoints = points.sorted()
+        val sortedPoints = uniquePoints.toList()
         val segments = mutableListOf<TimelineSegment>()
+        val activeSessions = mutableMapOf<String, ActivitySessionEntity>()
 
-        // Iterate through each interval between consecutive boundary points
         for (i in 0 until sortedPoints.size - 1) {
             val p1 = sortedPoints[i]
             val p2 = sortedPoints[i + 1]
 
-            // Find sessions that overlap with the interval [p1, p2]
-            val activeSessions = validSessions.filter {
-                !it.startedAt.isAfter(p1) && !it.endedAt!!.isBefore(p2)
-            }
+            // Process ends and starts at boundary point p1
+            endsByTime[p1]?.forEach { activeSessions.remove(it.id) }
+            startsByTime[p1]?.forEach { activeSessions[it.id] = it }
 
             if (activeSessions.isNotEmpty()) {
+                val sessionIds = activeSessions.keys.toSet()
+                val activityIds = activeSessions.values.map { it.activityId }.toSet()
+
                 segments.add(
                     TimelineSegment(
                         start = p1,
                         end = p2,
-                        activeSessionIds = activeSessions.map { it.id }.toSet(),
-                        activeActivityIds = activeSessions.map { it.activityId }.toSet()
+                        activeSessionIds = sessionIds,
+                        activeActivityIds = activityIds
                     )
                 )
             }

@@ -6,13 +6,17 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,9 +24,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.example.logapp.data.local.entity.ActivityEntity
+import com.example.logapp.core.designsystem.component.LogAppElevatedCard
+import com.example.logapp.core.designsystem.component.LogAppPrimaryButton
+import com.example.logapp.core.designsystem.component.LogAppSecondaryButton
+import com.example.logapp.core.designsystem.component.LogAppSectionHeader
+import com.example.logapp.core.designsystem.component.LogAppSnackbarHost
+import com.example.logapp.core.designsystem.component.LogAppStatusBadge
+import com.example.logapp.core.designsystem.component.StatusType
+import com.example.logapp.core.designsystem.tokens.spacing
 import com.example.logapp.data.local.entity.ActivitySessionEntity
 import com.example.logapp.feature.components.ActivityCard
 import kotlinx.coroutines.delay
@@ -37,20 +49,27 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val activities by viewModel.unarchivedActivities.collectAsState()
+    val filteredActivities by viewModel.filteredActivities.collectAsState()
     val activeSessions by viewModel.activeSessions.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
+
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = { LogAppSnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { 
-                    Text("TimeLens", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.displayMedium) 
+                title = {
+                    Text(
+                        text = "TimeLens",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.displayMedium
+                    )
                 },
                 actions = {
                     TextButton(onClick = onNavigateToActivities) {
-                        Text("Manage", fontWeight = FontWeight.Bold)
+                        Text("Quản lý", fontWeight = FontWeight.Bold)
                     }
                 }
             )
@@ -60,38 +79,51 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = spacing.medium)
         ) {
-            // Active Sessions Block
+            // 1. Active Sessions Section
             AnimatedVisibility(
                 visible = activeSessions.isNotEmpty(),
                 enter = expandVertically(animationSpec = tween(300)),
                 exit = shrinkVertically(animationSpec = tween(300))
             ) {
-                Column(modifier = Modifier.padding(bottom = 24.dp)) {
-                    Text(
-                        text = "ĐANG THEO DÕI",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.padding(bottom = spacing.medium)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = spacing.small),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ĐANG THEO DÕI",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        LogAppStatusBadge(
+                            status = StatusType.ACTIVE,
+                            text = "${activeSessions.size} đang chạy"
+                        )
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
                         activeSessions.forEach { session ->
                             val activity = activities.find { it.id == session.activityId }
+                            val activityName = activity?.name ?: "Chưa xác định"
                             ActiveSessionItem(
                                 session = session,
-                                activityName = activity?.name ?: "Unknown",
-                                onStop = { 
+                                activityName = activityName,
+                                activityColor = activity?.color,
+                                onStop = {
                                     viewModel.stopSession(session)
                                     coroutineScope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = "Đã dừng ${activity?.name}",
+                                        val result = snackbarHostState.showSnackbar(
+                                            message = "Đã dừng $activityName",
                                             actionLabel = "Hoàn tác",
                                             duration = SnackbarDuration.Short
                                         )
-                                        // Note: Real Undo logic to be wired in SessionRepository in future
+                                        if (result == SnackbarResult.ActionPerformed) {
+                                            viewModel.undoStopSession(session)
+                                        }
                                     }
                                 }
                             )
@@ -100,34 +132,129 @@ fun HomeScreen(
                 }
             }
 
-            Text(
-                text = "QUICK TRACKING",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(bottom = 12.dp, top = if(activeSessions.isEmpty()) 8.dp else 0.dp)
+            // 2. Quick Tracking Section Header
+            LogAppSectionHeader(
+                title = "QUICK TRACKING",
+                subtitle = "Chạm để bắt đầu ghi nhận ngay lập tức"
             )
-            
+
+            // Quick Search Bar (when there are 6+ activities or user is searching)
+            if (activities.size >= 6 || searchQuery.isNotBlank()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.onSearchQueryChange(it) },
+                    placeholder = { Text("Tìm nhanh hoạt động...") },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Tìm kiếm")
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Xóa")
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = spacing.small)
+                )
+            }
+
+            // 3. Grid / Empty States
             if (activities.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("Chưa có hoạt động nào", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Button(onClick = { viewModel.addSampleActivities() }) {
-                            Text("Thêm dữ liệu mẫu (Sample Data)")
+                // Edge Case 1: Empty State - No activities created yet
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LogAppElevatedCard(
+                        modifier = Modifier.fillMaxWidth().padding(spacing.medium)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(spacing.small),
+                            modifier = Modifier.fillMaxWidth().padding(spacing.small)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(spacing.extraSmall))
+                            Text(
+                                text = "Bắt đầu ghi nhận thời gian",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                text = "Tạo các hoạt động quen thuộc như Học tập, Làm việc, Đọc sách để bắt đầu quan sát bức tranh thực tế của bạn.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(spacing.small))
+                            LogAppPrimaryButton(
+                                text = "Tạo hoạt động mới",
+                                onClick = onNavigateToActivities,
+                                icon = Icons.Default.Add
+                            )
+                            LogAppSecondaryButton(
+                                text = "Thêm hoạt động mẫu",
+                                onClick = { viewModel.addSampleActivities() }
+                            )
+                        }
+                    }
+                }
+            } else if (filteredActivities.isEmpty() && searchQuery.isNotBlank()) {
+                // Edge Case 2: Empty Search Result
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(spacing.small)
+                    ) {
+                        Text(
+                            text = "Không tìm thấy hoạt động \"$searchQuery\"",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TextButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                            Text("Xem tất cả hoạt động", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             } else {
+                // Regular Activity Grid
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.small),
+                    verticalArrangement = Arrangement.spacedBy(spacing.small),
                     modifier = Modifier.weight(1f)
                 ) {
-                    items(activities, key = { it.id }) { activity ->
+                    items(filteredActivities, key = { it.id }) { activity ->
+                        val isRunning = activeSessions.any { it.activityId == activity.id }
                         ActivityCard(
                             name = activity.name,
                             color = activity.color,
+                            isActive = isRunning,
                             onClick = { viewModel.startActivity(activity.id) }
                         )
                     }
@@ -141,6 +268,7 @@ fun HomeScreen(
 fun ActiveSessionItem(
     session: ActivitySessionEntity,
     activityName: String,
+    activityColor: Long? = null,
     onStop: () -> Unit
 ) {
     var duration by remember { mutableStateOf(Duration.between(session.startedAt, Instant.now())) }
@@ -156,50 +284,71 @@ fun ActiveSessionItem(
     val minutes = duration.toMinutesPart()
     val seconds = duration.toSecondsPart()
     val durationString = "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}"
+    val iconColor = activityColor?.let { Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary
 
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        ),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(spacing.medium),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Pulse indicator
+            // Pulse indicator dot with Activity color
             Box(
                 modifier = Modifier
                     .size(12.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFE53935)) // Red indicator for active
+                    .background(Color(0xFFE53935))
             )
-            
-            Spacer(modifier = Modifier.width(12.dp))
-            
+
+            Spacer(modifier = Modifier.width(spacing.small))
+
+            // Initial icon letter
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(iconColor.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = activityName.take(1).uppercase(),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = iconColor,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.width(spacing.small))
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = activityName, 
-                    fontWeight = FontWeight.Bold, 
+                    text = activityName,
+                    fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1
                 )
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = durationString, 
-                    style = MaterialTheme.typography.titleLarge, 
+                    text = durationString,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Black
                 )
             }
-            
+
             FilledTonalButton(
                 onClick = onStop,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary
+                    contentColor = MaterialTheme.colorScheme.error
                 )
             ) {
                 Text("Dừng", fontWeight = FontWeight.Bold)

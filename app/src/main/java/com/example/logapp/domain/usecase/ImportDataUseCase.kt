@@ -25,9 +25,14 @@ class ImportDataUseCase @Inject constructor(
     private val syncMetadataRepository: SyncMetadataRepository,
     private val transactionProvider: TransactionProvider
 ) {
-    suspend operator fun invoke(jsonString: String, strategy: ImportStrategy) {
+    suspend fun previewImport(jsonString: String): com.example.logapp.domain.model.backup.BackupSchemaV1 {
         val schema = backupSerializer.importFromJson(jsonString)
         validationEngine.validate(schema)
+        return schema
+    }
+
+    suspend operator fun invoke(jsonString: String, strategy: ImportStrategy) {
+        val schema = previewImport(jsonString)
 
         transactionProvider.runAsTransaction {
             if (strategy == ImportStrategy.REPLACE) {

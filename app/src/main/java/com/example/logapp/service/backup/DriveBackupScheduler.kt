@@ -24,21 +24,35 @@ object DriveBackupScheduler {
         WorkManager.getInstance(context).enqueue(backupWorkRequest)
     }
 
-    fun enablePeriodicBackup(context: Context) {
+    fun schedulePeriodicBackup(context: Context, frequency: String) {
+        if (frequency.equals("manual", ignoreCase = true)) {
+            disablePeriodicBackup(context)
+            return
+        }
+
+        val repeatIntervalDays = when (frequency.lowercase()) {
+            "weekly" -> 7L
+            else -> 1L // "daily" or default
+        }
+
         val constraints = Constraints.Builder()
-            .setRequiredNetworkType(NetworkType.UNMETERED) // Typically we only backup automatically on Wi-Fi
-            .setRequiresCharging(true)
+            .setRequiredNetworkType(NetworkType.UNMETERED) // Typically auto backup on Wi-Fi
+            .setRequiresBatteryNotLow(true)
             .build()
 
-        val periodicWorkRequest = PeriodicWorkRequestBuilder<DriveBackupWorker>(1, TimeUnit.DAYS)
+        val periodicWorkRequest = PeriodicWorkRequestBuilder<DriveBackupWorker>(repeatIntervalDays, TimeUnit.DAYS)
             .setConstraints(constraints)
             .build()
 
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             PERIODIC_BACKUP_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             periodicWorkRequest
         )
+    }
+
+    fun enablePeriodicBackup(context: Context) {
+        schedulePeriodicBackup(context, "daily")
     }
 
     fun disablePeriodicBackup(context: Context) {

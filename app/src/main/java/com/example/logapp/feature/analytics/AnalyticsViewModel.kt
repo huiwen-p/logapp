@@ -52,7 +52,7 @@ class AnalyticsViewModel @Inject constructor(
         _selectedTab,
         _selectedDate
     ) { sessions, activities, boundaryStr, tab, date ->
-        val (hours, minutes) = boundaryStr.split(":").map { it.toIntOrNull() ?: 0 }
+        val (hours, minutes) = PreferencesManager.parseDayBoundary(boundaryStr)
         val zone = ZoneId.systemDefault()
         val now = Instant.now()
         

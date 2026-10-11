@@ -9,7 +9,13 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import com.example.logapp.core.designsystem.tokens.DarkSemanticColors
+import com.example.logapp.core.designsystem.tokens.LightSemanticColors
+import com.example.logapp.core.designsystem.tokens.LocalSemanticColors
+import com.example.logapp.core.designsystem.tokens.LocalSpacing
+import com.example.logapp.core.designsystem.tokens.Spacing
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryDark,
@@ -62,9 +68,16 @@ fun LogappTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    val semanticColors = if (darkTheme) DarkSemanticColors else LightSemanticColors
+
+    CompositionLocalProvider(
+        LocalSpacing provides Spacing(),
+        LocalSemanticColors provides semanticColors
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

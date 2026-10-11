@@ -13,19 +13,24 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.logapp.data.local.entity.ActivityEntity
 import com.example.logapp.data.local.entity.ActivitySessionEntity
+import com.example.logapp.feature.timeline.engine.TimelineLayoutEngine
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun TimelineCanvas(
@@ -44,36 +49,28 @@ fun TimelineCanvas(
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
     val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     val nowLineColor = Color(0xFFE53935) // Red indicator
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+
+    // Pre-measure hour labels to optimize rendering performance and prevent negative constraint crashes
+    val hourLabels = remember(textMeasurer, onSurfaceColor) {
+        (0..24).map { hour ->
+            textMeasurer.measure(
+                text = String.format("%02d:00", hour),
+                style = TextStyle(color = onSurfaceColor, fontSize = 12.sp)
+            )
+        }
+    }
 
     // To store rendered rectangles for tap detection
     val renderedBlocks = remember { mutableStateListOf<Pair<Rect, ActivitySessionEntity>>() }
 
-    // Overlap layout logic: Sort sessions by start time
-    val sortedSessions = sessions.sortedBy { it.startedAt }
-    
-    // Group overlapping sessions to calculate columns
-    val sessionColumns = mutableMapOf<String, Int>()
-    val columns = mutableListOf<MutableList<ActivitySessionEntity>>()
-    
-    for (session in sortedSessions) {
-        var placed = false
-        for (i in 0 until columns.size) {
-            val lastInCol = columns[i].last()
-            val lastEnd = lastInCol.endedAt ?: Instant.now()
-            if (!session.startedAt.isBefore(lastEnd)) {
-                columns[i].add(session)
-                sessionColumns[session.id] = i
-                placed = true
-                break
-            }
-        }
-        if (!placed) {
-            columns.add(mutableListOf(session))
-            sessionColumns[session.id] = columns.size - 1
-        }
+    // Cluster-based Overlap layout logic: Isolated sessions get 100% width, overlapping clusters divide width
+    val layoutMap = remember(sessions) {
+        TimelineLayoutEngine.calculateLayout(sessions)
     }
-    
-    val totalColumns = maxOf(1, columns.size)
+    val sortedSessions = remember(sessions) {
+        sessions.sortedBy { it.startedAt }
+    }
 
     Canvas(
         modifier = modifier
@@ -134,14 +131,15 @@ fun TimelineCanvas(
                         end = Offset(canvasWidth, y),
                         strokeWidth = 1.dp.toPx()
                     )
-                    val textTopLeftY = y - 24f
-                    if (textTopLeftY < canvasHeight && textTopLeftY > -50f) {
-                        drawText(
-                            textMeasurer = textMeasurer,
-                            text = String.format("%02d:00", i / 2),
-                            topLeft = Offset(10f, textTopLeftY),
-                            style = TextStyle(color = onSurfaceColor, fontSize = 12.sp)
-                        )
+                    val textLayoutResult = hourLabels.getOrNull(i / 2)
+                    if (textLayoutResult != null) {
+                        val textTopLeftY = y - (textLayoutResult.size.height / 2f)
+                        if (textTopLeftY in -textLayoutResult.size.height.toFloat()..canvasHeight) {
+                            drawText(
+                                textLayoutResult = textLayoutResult,
+                                topLeft = Offset(10f, textTopLeftY)
+                            )
+                        }
                     }
                 } else {
                     // Half hour
@@ -178,7 +176,7 @@ fun TimelineCanvas(
         clipRect(left = timeAxisWidth, top = 0f, right = canvasWidth, bottom = canvasHeight) {
             sortedSessions.forEach { session ->
                 val activity = activities.find { it.id == session.activityId }
-                val color = activity?.color?.let { Color(it.toInt()) } ?: Color.Gray
+                val color = activity?.color?.let { Color(it.toInt()) } ?: Color(0xFF6750A4)
 
                 val startMilli = maxOf(startOfDayMillis, session.startedAt.toEpochMilli())
                 val endMilli = minOf(startOfDayMillis + oneDayMillis, session.endedAt?.toEpochMilli() ?: now.toEpochMilli())
@@ -191,43 +189,129 @@ fun TimelineCanvas(
                     return@forEach
                 }
 
-                val height = (endY - startY).coerceAtLeast(16f)
+                val height = (endY - startY).coerceAtLeast(18f)
                 
-                val colIndex = sessionColumns[session.id] ?: 0
-                val colWidth = (canvasWidth - timeAxisWidth - 16f) / totalColumns
-                val x = timeAxisWidth + 8f + colIndex * colWidth
+                val layoutPos = layoutMap[session.id]
+                val colIndex = layoutPos?.columnIndex ?: 0
+                val totalCols = layoutPos?.totalColumns ?: 1
+                val isOverlapping = layoutPos?.isOverlapping ?: false
 
-                val rect = Rect(Offset(x, startY), Size(colWidth - 4f, height))
+                val availableWidth = canvasWidth - timeAxisWidth - 16f
+                val colWidth = availableWidth / totalCols
+                val x = timeAxisWidth + 8f + colIndex * colWidth
+                val blockWidth = (colWidth - 4f).coerceAtLeast(16f)
+
+                val rect = Rect(Offset(x, startY), Size(blockWidth, height))
                 renderedBlocks.add(Pair(rect, session))
 
+                // Block background
                 drawRoundRect(
-                    color = color.copy(alpha = 0.85f),
+                    color = color.copy(alpha = 0.90f),
                     topLeft = Offset(x, startY),
-                    size = Size(colWidth - 4f, height),
-                    cornerRadius = CornerRadius(16f, 16f)
+                    size = Size(blockWidth, height),
+                    cornerRadius = CornerRadius(14f, 14f)
                 )
 
+                // Block subtle outline
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.18f),
+                    topLeft = Offset(x, startY),
+                    size = Size(blockWidth, height),
+                    cornerRadius = CornerRadius(14f, 14f),
+                    style = Stroke(width = 1.dp.toPx())
+                )
+
+                // Visual cue for overlap: subtle dashed indicator + icon cue
+                if (isOverlapping) {
+                    // Left overlap indicator stripe
+                    drawRoundRect(
+                        color = Color(0xFFFFB74D), // Amber warm indicator
+                        topLeft = Offset(x, startY),
+                        size = Size(4.dp.toPx(), height),
+                        cornerRadius = CornerRadius(4f, 4f)
+                    )
+
+                    // Overlap visual cue symbol (⇄) in top right if block is large enough
+                    if (blockWidth > 70f && height > 28f) {
+                        val overlapSymbol = textMeasurer.measure(
+                            text = "⇄",
+                            style = TextStyle(
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        )
+                        val symbolX = x + blockWidth - overlapSymbol.size.width - 8f
+                        val symbolY = startY + 6f
+                        if (symbolX > x && symbolY + overlapSymbol.size.height < startY + height) {
+                            drawText(
+                                textLayoutResult = overlapSymbol,
+                                topLeft = Offset(symbolX, symbolY)
+                            )
+                        }
+                    }
+                }
+
+                // Selection Border
                 if (selectedSessionIds.contains(session.id)) {
                     drawRoundRect(
                         color = Color.White,
                         topLeft = Offset(x, startY),
-                        size = Size(colWidth - 4f, height),
-                        cornerRadius = CornerRadius(16f, 16f),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4.dp.toPx())
+                        size = Size(blockWidth, height),
+                        cornerRadius = CornerRadius(14f, 14f),
+                        style = Stroke(width = 3.5.dp.toPx())
                     )
                 }
 
-                // Draw Activity Name inside block if height allows and it's within visible bounds
-                if (height > 40f && colWidth > 100f) {
-                    val textTopLeftY = startY + 16f
-                    val textTopLeftX = x + 16f
-                    if (textTopLeftY < canvasHeight && textTopLeftX < canvasWidth) {
-                        drawText(
-                            textMeasurer = textMeasurer,
-                            text = activity?.name ?: "",
-                            topLeft = Offset(textTopLeftX, textTopLeftY),
-                            style = TextStyle(color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                // Content inside block
+                val activityName = activity?.name.orEmpty()
+                if (activityName.isNotEmpty() && height > 28f && blockWidth > 50f) {
+                    val textTopLeftY = startY + 8f
+                    val textTopLeftX = if (isOverlapping) x + 12f else x + 10f
+                    val maxTextWidth = (blockWidth - (if (isOverlapping) 34f else 20f)).toInt().coerceAtLeast(0)
+
+                    if (maxTextWidth > 0 && textTopLeftY in -40f..canvasHeight && textTopLeftX in 0f..canvasWidth) {
+                        val textLayoutResult = textMeasurer.measure(
+                            text = activityName,
+                            style = TextStyle(
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (height > 50f) 13.sp else 11.sp
+                            ),
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1,
+                            constraints = Constraints(maxWidth = maxTextWidth)
                         )
+                        drawText(
+                            textLayoutResult = textLayoutResult,
+                            topLeft = Offset(textTopLeftX, textTopLeftY)
+                        )
+
+                        // Draw time range (HH:mm - HH:mm) if block has enough vertical space
+                        if (height >= 56f) {
+                            val startLocal = session.startedAt.atZone(ZoneId.systemDefault()).toLocalTime()
+                            val endLocal = (session.endedAt ?: now).atZone(ZoneId.systemDefault()).toLocalTime()
+                            val timeStr = "${startLocal.format(timeFormatter)} - ${if (session.endedAt == null) "hiện tại" else endLocal.format(timeFormatter)}"
+
+                            val timeTopLeftY = textTopLeftY + textLayoutResult.size.height + 2f
+                            if (timeTopLeftY + 14f <= startY + height) {
+                                val timeLayoutResult = textMeasurer.measure(
+                                    text = timeStr,
+                                    style = TextStyle(
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Medium
+                                    ),
+                                    overflow = TextOverflow.Ellipsis,
+                                    maxLines = 1,
+                                    constraints = Constraints(maxWidth = maxTextWidth)
+                                )
+                                drawText(
+                                    textLayoutResult = timeLayoutResult,
+                                    topLeft = Offset(textTopLeftX, timeTopLeftY)
+                                )
+                            }
+                        }
                     }
                 }
             }

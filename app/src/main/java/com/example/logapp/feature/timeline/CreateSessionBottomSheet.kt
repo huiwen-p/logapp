@@ -2,14 +2,14 @@ package com.example.logapp.feature.timeline
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.logapp.core.designsystem.component.*
+import com.example.logapp.core.designsystem.tokens.spacing
 import com.example.logapp.data.local.entity.ActivityEntity
 import java.time.Instant
 import java.time.LocalDateTime
@@ -44,15 +44,14 @@ fun CreateSessionBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = spacing.medium)
+                .padding(bottom = spacing.extraLarge),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium)
         ) {
-            Text(
-                text = "Thêm Nhật ký Thủ công",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+            LogAppBottomSheetHeader(
+                title = "Thêm Nhật ký Thủ công",
+                subtitle = "Tạo một phiên hoạt động trong quá khứ",
+                onClose = onDismiss
             )
 
             // Activity Selection
@@ -61,7 +60,7 @@ fun CreateSessionBottomSheet(
                 onExpandedChange = { expanded = it }
             ) {
                 OutlinedTextField(
-                    value = selectedActivity?.name ?: "Chọn Activity",
+                    value = selectedActivity?.name ?: "Chọn Hoạt động",
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Hoạt động") },
@@ -84,42 +83,51 @@ fun CreateSessionBottomSheet(
                 }
             }
 
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            LogAppCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Bắt đầu:", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            text = editedStart.format(formatter),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clickable { showStartTimePicker = true }
-                                .padding(4.dp)
-                        )
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Bắt đầu:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = editedStart.format(formatter),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { showStartTimePicker = true }
+                            .padding(4.dp)
+                    )
+                }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Kết thúc:", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            text = editedEnd.format(formatter),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .clickable { showEndTimePicker = true }
-                                .padding(4.dp)
-                        )
-                    }
+                Spacer(modifier = Modifier.height(spacing.small))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Kết thúc:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = editedEnd.format(formatter),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { showEndTimePicker = true }
+                            .padding(4.dp)
+                    )
                 }
             }
 
@@ -127,19 +135,29 @@ fun CreateSessionBottomSheet(
                 value = note,
                 onValueChange = { note = it },
                 label = { Text("Ghi chú (Note)") },
+                placeholder = { Text("Ghi chú thêm về phiên...") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3
             )
 
-            val isError = editedStart.isAfter(editedEnd)
+            val isError = !editedEnd.isAfter(editedStart)
             if (isError) {
-                Text("Lỗi: Giờ kết thúc không thể trước giờ bắt đầu", color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = "Lỗi: Giờ kết thúc phải diễn ra sau giờ bắt đầu",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
             if (selectedActivity == null) {
-                Text("Lỗi: Vui lòng chọn một hoạt động", color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = "Lỗi: Vui lòng chọn một hoạt động",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
-            Button(
+            LogAppPrimaryButton(
+                text = "Tạo phiên",
                 onClick = {
                     val finalStart = editedStart.atZone(ZoneId.systemDefault()).toInstant()
                     val finalEnd = editedEnd.atZone(ZoneId.systemDefault()).toInstant()
@@ -149,9 +167,7 @@ fun CreateSessionBottomSheet(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isError && selectedActivity != null
-            ) {
-                Text("Thêm", fontWeight = FontWeight.Bold)
-            }
+            )
         }
     }
 

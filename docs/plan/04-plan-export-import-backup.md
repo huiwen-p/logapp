@@ -1,6 +1,6 @@
 # Plan 04 — Export, Import & Local Backup
 
-**Status:** `TODO`
+**Status:** `DONE`
 
 ## Goal
 Xây dựng cơ chế Export (JSON, CSV) và Import an toàn.

@@ -19,6 +19,10 @@ class GoogleAuthRepositoryImpl @Inject constructor(
         return account?.idToken ?: account?.serverAuthCode
     }
 
+    override fun getSignedInEmail(): String? {
+        return GoogleSignIn.getLastSignedInAccount(context)?.email
+    }
+
     override fun isSignedIn(): Boolean {
         return GoogleSignIn.getLastSignedInAccount(context) != null
     }

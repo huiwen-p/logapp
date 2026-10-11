@@ -49,7 +49,7 @@ class TimelineViewModel @Inject constructor(
         _selectedDate,
         preferencesManager.dayBoundary
     ) { sessions, activities, date, boundaryStr ->
-        val (hours, minutes) = boundaryStr.split(":").map { it.toIntOrNull() ?: 0 }
+        val (hours, minutes) = PreferencesManager.parseDayBoundary(boundaryStr)
         
         val startOfDay = date.atTime(hours, minutes).atZone(ZoneId.systemDefault()).toInstant()
         val endOfDay = date.plusDays(1).atTime(hours, minutes).atZone(ZoneId.systemDefault()).toInstant()

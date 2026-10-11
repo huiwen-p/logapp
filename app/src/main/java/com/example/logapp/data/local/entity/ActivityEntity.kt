@@ -1,11 +1,18 @@
 package com.example.logapp.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.Instant
 import java.util.UUID
 
-@Entity(tableName = "activities")
+@Entity(
+    tableName = "activities",
+    indices = [
+        Index(value = ["isArchived"]),
+        Index(value = ["sortOrder"])
+    ]
+)
 data class ActivityEntity(
     @PrimaryKey
     val id: String = UUID.randomUUID().toString(),

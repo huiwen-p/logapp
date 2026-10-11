@@ -2,6 +2,8 @@ package com.example.logapp.data.backup
 
 import android.content.Context
 import com.example.logapp.domain.backup.DriveBackupManager
+import com.example.logapp.domain.backup.DriveBackupFile
+import java.io.ByteArrayOutputStream
 import com.example.logapp.domain.repository.GoogleAuthRepository
 import com.google.api.client.http.javanet.NetHttpTransport
 import com.google.api.client.googleapis.extensions.android.gms.auth.GoogleAccountCredential
@@ -35,7 +37,11 @@ class DriveBackupManagerImpl @Inject constructor(
         val credential = GoogleAccountCredential.usingOAuth2(
             context, listOf(DriveScopes.DRIVE_FILE)
         )
-        credential.selectedAccount = account.account
+        val email = account.email ?: account.account?.name
+        credential.selectedAccountName = email
+        if (account.account != null) {
+            credential.selectedAccount = account.account
+        }
 
         return Drive.Builder(httpTransport, jsonFactory, credential)
             .setApplicationName("LogApp")
@@ -67,11 +73,12 @@ class DriveBackupManagerImpl @Inject constructor(
 
             Result.success(file.id)
         } catch (e: Exception) {
+            android.util.Log.e("DriveBackup", "uploadBackupFile error: ${e.message}", e)
             Result.failure(e)
         }
     }
 
-    override suspend fun listBackups(): Result<List<String>> = withContext(Dispatchers.IO) {
+    override suspend fun listBackups(): Result<List<DriveBackupFile>> = withContext(Dispatchers.IO) {
         try {
             val driveService = getDriveService()
             val folderId = findFolderId(driveService, "LogApp Backups") ?: return@withContext Result.success(emptyList())
@@ -82,9 +89,29 @@ class DriveBackupManagerImpl @Inject constructor(
                 .setFields("files(id, name, createdTime)")
                 .execute()
 
-            val files = result.files?.map { it.name } ?: emptyList()
+            val files = result.files?.map { 
+                DriveBackupFile(
+                    id = it.id, 
+                    name = it.name, 
+                    createdTime = it.createdTime?.value ?: 0L
+                )
+            } ?: emptyList()
             Result.success(files)
         } catch (e: Exception) {
+            android.util.Log.e("DriveBackup", "listBackups error: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun downloadBackup(fileId: String): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val driveService = getDriveService()
+            val outputStream = ByteArrayOutputStream()
+            driveService.files().get(fileId).executeMediaAndDownloadTo(outputStream)
+            val json = outputStream.toString("UTF-8")
+            Result.success(json)
+        } catch (e: Exception) {
+            android.util.Log.e("DriveBackup", "downloadBackup error: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -109,6 +136,7 @@ class DriveBackupManagerImpl @Inject constructor(
             }
             Result.success(Unit)
         } catch (e: Exception) {
+            android.util.Log.e("DriveBackup", "deleteOldBackups error: ${e.message}", e)
             Result.failure(e)
         }
     }

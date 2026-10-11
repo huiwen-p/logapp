@@ -17,4 +17,10 @@ object AppModule {
     fun providePreferencesManager(@ApplicationContext context: Context): PreferencesManager {
         return PreferencesManager(context)
     }
+
+    @Provides
+    @Singleton
+    fun provideCrashReporter(logger: com.example.logapp.core.common.logging.SanitizedAppLogger): com.example.logapp.core.common.logging.CrashReporter {
+        return logger
+    }
 }

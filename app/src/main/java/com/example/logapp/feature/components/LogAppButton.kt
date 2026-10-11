@@ -21,25 +21,19 @@ fun LogAppButton(
     enabled: Boolean = true,
     isDanger: Boolean = false
 ) {
-    val containerColor = if (isDanger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-    val contentColor = if (isDanger) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onPrimary
-
-    Button(
-        onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .padding(vertical = 4.dp),
-        enabled = enabled,
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = containerColor,
-            contentColor = contentColor
-        )
-    ) {
-        Text(
+    if (isDanger) {
+        com.example.logapp.core.designsystem.component.LogAppDangerButton(
             text = text,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled
+        )
+    } else {
+        com.example.logapp.core.designsystem.component.LogAppPrimaryButton(
+            text = text,
+            onClick = onClick,
+            modifier = modifier,
+            enabled = enabled
         )
     }
 }

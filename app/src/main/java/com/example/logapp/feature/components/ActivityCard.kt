@@ -1,5 +1,6 @@
 package com.example.logapp.feature.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,56 +24,79 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun ActivityCard(
     name: String,
     color: Long?, // ARGB color as Long
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isActive: Boolean = false
 ) {
-    val cardColor = MaterialTheme.colorScheme.surfaceVariant
+    val cardColor = if (isActive) {
+        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
     val iconColor = color?.let { Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary
 
     Surface(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(16.dp))
             .clickable { onClick() },
         color = cardColor,
-        tonalElevation = 2.dp
+        border = if (isActive) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+        tonalElevation = if (isActive) 4.dp else 1.dp
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(iconColor.copy(alpha = 0.2f)),
-                contentAlignment = Alignment.Center
-            ) {
-                // Placeholder for an actual icon based on the activity
-                Text(
-                    text = name.take(1).uppercase(),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = iconColor,
-                    fontWeight = FontWeight.Bold
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isActive) {
+                // Active indicator badge in the top right
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE53935))
                 )
             }
-            Text(
-                text = name,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 12.dp)
-            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(iconColor.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = iconColor,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        lineHeight = 16.sp,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium
+                    ),
+                    color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
     }
 }

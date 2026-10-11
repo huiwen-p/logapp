@@ -28,7 +28,10 @@ object DatabaseModule {
             context,
             TimeLensDatabase::class.java,
             "timelens_db"
-        ).build()
+        )
+        .addMigrations(TimeLensDatabase.MIGRATION_1_2)
+        .fallbackToDestructiveMigration()
+        .build()
     }
 
     @Provides
@@ -73,5 +76,16 @@ object DatabaseModule {
     @Singleton
     fun provideTransactionProvider(database: TimeLensDatabase): com.example.logapp.domain.repository.TransactionProvider {
         return com.example.logapp.data.repository.TransactionProviderImpl(database)
+    }
+
+    @Provides
+    fun provideDataHealthDao(database: TimeLensDatabase): com.example.logapp.data.local.dao.DataHealthDao {
+        return database.dataHealthDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDataHealthRepository(dao: com.example.logapp.data.local.dao.DataHealthDao): com.example.logapp.domain.repository.DataHealthRepository {
+        return com.example.logapp.data.repository.DataHealthRepositoryImpl(dao)
     }
 }

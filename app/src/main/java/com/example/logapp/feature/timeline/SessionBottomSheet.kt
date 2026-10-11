@@ -8,6 +8,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.logapp.core.designsystem.component.*
+import com.example.logapp.core.designsystem.tokens.spacing
 import com.example.logapp.data.local.entity.ActivityEntity
 import com.example.logapp.data.local.entity.ActivitySessionEntity
 import java.time.Instant
@@ -40,7 +42,8 @@ fun SessionBottomSheet(
 
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
-    var showSplitTimePicker by remember { mutableStateOf(false) }
+    var showSplitDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     
     val initialSplitLocal = remember(startLocal, endLocal) {
         if (endLocal != null) {
@@ -61,56 +64,78 @@ fun SessionBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = spacing.medium)
+                .padding(bottom = spacing.extraLarge),
+            verticalArrangement = Arrangement.spacedBy(spacing.medium)
         ) {
-            Text(
-                text = activity?.name ?: "Unknown Activity",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
+            LogAppBottomSheetHeader(
+                title = activity?.name ?: "Phiên hoạt động",
+                subtitle = "Chi tiết và chỉnh sửa phiên ghi nhận",
+                onClose = onDismiss
             )
 
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            LogAppCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Bắt đầu:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = editedStart.format(formatter),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clickable { showStartTimePicker = true }
+                            .padding(4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(spacing.small))
+
+                if (editedEnd != null) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Bắt đầu:", style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            text = editedStart.format(formatter),
+                            "Kết thúc:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = editedEnd!!.format(formatter),
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
-                                .clickable { showStartTimePicker = true }
+                                .clickable { showEndTimePicker = true }
                                 .padding(4.dp)
                         )
                     }
-
-                    if (editedEnd != null) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("Kết thúc:", style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                text = editedEnd!!.format(formatter),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier
-                                    .clickable { showEndTimePicker = true }
-                                    .padding(4.dp)
-                            )
-                        }
-                    } else {
-                        Text("Đang diễn ra...", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.secondary)
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Trạng thái:",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        LogAppStatusBadge(
+                            status = StatusType.ACTIVE,
+                            text = "Đang diễn ra"
+                        )
                     }
                 }
             }
@@ -119,58 +144,73 @@ fun SessionBottomSheet(
                 value = note,
                 onValueChange = { note = it },
                 label = { Text("Ghi chú (Note)") },
+                placeholder = { Text("Thêm ghi chú cho phiên này...") },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3
             )
 
             val isError = editedEnd != null && editedStart.isAfter(editedEnd)
             if (isError) {
-                Text("Lỗi: Giờ kết thúc không thể trước giờ bắt đầu", color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = "Lỗi: Giờ kết thúc không thể diễn ra trước giờ bắt đầu",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(spacing.small)
             ) {
-                OutlinedButton(
-                    onClick = onDelete,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text("Xóa", fontWeight = FontWeight.Bold)
-                }
-
-                OutlinedButton(
-                    onClick = { showSplitTimePicker = true },
+                LogAppDangerButton(
+                    text = "Xóa",
+                    onClick = { showDeleteConfirmDialog = true },
                     modifier = Modifier.weight(1f)
-                ) {
-                    Text("Chia", fontWeight = FontWeight.Bold)
-                }
+                )
 
-                Button(
+                LogAppSecondaryButton(
+                    text = "Chia",
+                    onClick = { showSplitDialog = true },
+                    modifier = Modifier.weight(1f)
+                )
+
+                LogAppPrimaryButton(
+                    text = "Lưu",
                     onClick = {
                         val finalStart = editedStart.atZone(ZoneId.systemDefault()).toInstant()
                         val finalEnd = editedEnd?.atZone(ZoneId.systemDefault())?.toInstant()
                         onSave(finalStart, finalEnd, note)
                     },
-                    modifier = Modifier.weight(1.5f),
-                    enabled = !isError
-                ) {
-                    Text("Lưu", fontWeight = FontWeight.Bold)
-                }
+                    enabled = !isError,
+                    modifier = Modifier.weight(1.4f)
+                )
             }
         }
     }
 
-    if (showSplitTimePicker) {
-        TimePickerDialogWrapper(
-            initialTime = initialSplitLocal,
-            onConfirm = { splitTimeLocal ->
-                val finalSplit = splitTimeLocal.atZone(ZoneId.systemDefault()).toInstant()
-                onSplit(finalSplit)
-                showSplitTimePicker = false
+    if (showDeleteConfirmDialog) {
+        LogAppConfirmDialog(
+            title = "Xóa phiên hoạt động?",
+            message = "Bạn có chắc chắn muốn xóa phiên ghi nhận này không? Thao tác này không thể hoàn tác.",
+            onConfirm = {
+                showDeleteConfirmDialog = false
+                onDelete()
             },
-            onDismiss = { showSplitTimePicker = false }
+            onDismiss = { showDeleteConfirmDialog = false },
+            confirmText = "Xóa",
+            isDestructive = true
+        )
+    }
+
+    if (showSplitDialog) {
+        SplitSessionDialog(
+            session = session,
+            initialSplitTime = initialSplitLocal,
+            onConfirm = { splitInstant ->
+                showSplitDialog = false
+                onSplit(splitInstant)
+            },
+            onDismiss = { showSplitDialog = false }
         )
     }
 
@@ -199,6 +239,111 @@ fun SessionBottomSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun SplitSessionDialog(
+    session: ActivitySessionEntity,
+    initialSplitTime: LocalDateTime,
+    onConfirm: (Instant) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val state = rememberTimePickerState(
+        initialHour = initialSplitTime.hour,
+        initialMinute = initialSplitTime.minute,
+        is24Hour = true
+    )
+
+    val currentSplitTime = initialSplitTime.withHour(state.hour).withMinute(state.minute)
+    val currentSplitInstant = currentSplitTime.atZone(ZoneId.systemDefault()).toInstant()
+
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+    val fullFormatter = DateTimeFormatter.ofPattern("HH:mm, dd/MM")
+
+    val startInstant = session.startedAt
+    val endInstant = session.endedAt ?: Instant.now()
+
+    val isAfterStart = currentSplitInstant.isAfter(startInstant)
+    val isBeforeEnd = currentSplitInstant.isBefore(endInstant)
+    val isValid = isAfterStart && isBeforeEnd
+
+    val startStr = startInstant.atZone(ZoneId.systemDefault()).format(fullFormatter)
+    val endStr = if (session.endedAt != null) {
+        session.endedAt.atZone(ZoneId.systemDefault()).format(fullFormatter)
+    } else {
+        "Hiện tại"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Chia phiên hoạt động",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = "Khoảng thời gian: $startStr → $endStr",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                TimePicker(state = state)
+
+                if (!isValid) {
+                    Text(
+                        text = "⚠️ Thời gian chia (${currentSplitTime.format(timeFormatter)}) phải nằm giữa thời điểm bắt đầu và kết thúc.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    val splitStr = currentSplitTime.format(timeFormatter)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    ) {
+                        Text(
+                            text = "Xem trước sau khi chia:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "• Phiên 1: $startStr → $splitStr\n• Phiên 2: $splitStr → $endStr",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(currentSplitInstant) },
+                enabled = isValid
+            ) {
+                Text(
+                    text = "Xác nhận chia",
+                    fontWeight = FontWeight.Bold,
+                    color = if (isValid) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Hủy")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun TimePickerDialogWrapper(
     initialTime: LocalDateTime,
     onConfirm: (LocalDateTime) -> Unit,
@@ -212,7 +357,7 @@ fun TimePickerDialogWrapper(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Chọn Giờ") },
+        title = { Text("Chọn Giờ", fontWeight = FontWeight.Bold) },
         text = {
             TimePicker(state = state)
         },
@@ -221,7 +366,7 @@ fun TimePickerDialogWrapper(
                 val newTime = initialTime.withHour(state.hour).withMinute(state.minute)
                 onConfirm(newTime)
             }) {
-                Text("OK")
+                Text("OK", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

@@ -46,8 +46,8 @@ Plan 01 ─────────┼──────────────
 | 01 | [Plan 01: Hoàn thiện Core Domain](01-plan-hoan-thien-core-domain.md) | Xử lý Delete/Archive Activity, Soft Delete Session, Day Boundary. | Không | LOW | `DONE` |
 | 02 | [Plan 02: Timeline & Session Management](02-plan-timeline-session-management.md) | Thêm Split, Merge, Add manual, Edit session. | Plan 01 | MEDIUM | `DONE` |
 | 03 | [Plan 03: Analytics & Reports](03-plan-analytics-reports.md) | Hoàn thiện Daily, Weekly, Monthly và Activity Relationships. | Plan 02 | LOW | `DONE` |
-| 04 | [Plan 04: Export, Import & Local Backup](04-plan-export-import-backup.md) | Export CSV, Import JSON Validation (Merge/Replace). | Plan 01 | HIGH | `TODO` |
-| 05 | [Plan 05: Google Drive Backup & Restore](05-plan-drive-backup.md) | Auto Backup (7 files), Download/Restore. | Plan 04 | MEDIUM | `TODO` |
+| 04 | [Plan 04: Export, Import & Local Backup](04-plan-export-import-backup.md) | Export CSV, Import JSON Validation (Merge/Replace). | Plan 01 | HIGH | `DONE` |
+| 05 | [Plan 05: Google Drive Backup & Restore](05-plan-drive-backup.md) | Auto Backup (7 files), Download/Restore. | Plan 04 | MEDIUM | `DONE` |
 | 06 | [Plan 06: Firebase Cloud Sync](06-plan-firebase-sync.md) | Đồng bộ 2 chiều (Cloud/Local), Xử lý Conflict. | Plan 01 | CRITICAL | `BLOCKED` |
-| 07 | [Plan 07: Reliability & Hardening](07-plan-production-hardening.md) | Data Health, Error Handling, Performance Profiling. | Độc lập | LOW | `TODO` |
-| 08 | [Plan 08: UI/UX Development](08-plan-ui-ux-optimization.md) | Design System, Stateful UX, Journey Testing. | Độc lập | MEDIUM | `TODO` |
+| 07 | [Plan 07: Reliability & Hardening](07-plan-production-hardening.md) | Data Health, Error Handling, Performance Profiling. | Độc lập | LOW | `DONE` |
+| 08 | [Plan 08: UI/UX Development](08-plan-ui-ux-optimization.md) | Design System, Stateful UX, Journey Testing. | Độc lập | MEDIUM | `IN_PROGRESS` |
