@@ -2,10 +2,15 @@ package com.example.logapp.feature.timeline
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.logapp.core.designsystem.component.*
@@ -16,6 +21,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,7 +46,9 @@ fun SessionBottomSheet(
     var editedStart by remember { mutableStateOf(startLocal) }
     var editedEnd by remember { mutableStateOf(endLocal) }
 
+    var showStartDatePicker by remember { mutableStateOf(false) }
     var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
     var showSplitDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
@@ -55,11 +63,25 @@ fun SessionBottomSheet(
         }
     }
 
-    val formatter = DateTimeFormatter.ofPattern("HH:mm, dd/MM/yyyy")
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+    var isDismissing by remember { mutableStateOf(false) }
+
+    fun dismissSmoothly(action: () -> Unit = onDismiss) {
+        if (isDismissing) return
+        isDismissing = true
+        coroutineScope.launch {
+            sheetState.hide()
+            action()
+        }
+    }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        onDismissRequest = { dismissSmoothly() },
+        sheetState = sheetState
     ) {
         Column(
             modifier = Modifier
@@ -71,7 +93,7 @@ fun SessionBottomSheet(
             LogAppBottomSheetHeader(
                 title = activity?.name ?: "Phiên hoạt động",
                 subtitle = "Chi tiết và chỉnh sửa phiên ghi nhận",
-                onClose = onDismiss
+                onClose = { dismissSmoothly() }
             )
 
             LogAppCard(
@@ -87,15 +109,41 @@ fun SessionBottomSheet(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        text = editedStart.format(formatter),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clickable { showStartTimePicker = true }
-                            .padding(4.dp)
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showStartDatePicker = true }
+                        ) {
+                            Text(
+                                text = editedStart.format(dateFormatter),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showStartTimePicker = true }
+                        ) {
+                            Text(
+                                text = editedStart.format(timeFormatter),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(spacing.small))
@@ -111,15 +159,41 @@ fun SessionBottomSheet(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Text(
-                            text = editedEnd!!.format(formatter),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.extraSmall),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { showEndDatePicker = true }
+                            ) {
+                                Text(
+                                    text = editedEnd!!.format(dateFormatter),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
                                 .clickable { showEndTimePicker = true }
-                                .padding(4.dp)
-                        )
+                            ) {
+                                Text(
+                                    text = editedEnd!!.format(timeFormatter),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
                     }
                 } else {
                     Row(
@@ -139,6 +213,35 @@ fun SessionBottomSheet(
                     }
                 }
             }
+
+            // Overnight note
+            val isOvernight = editedEnd != null && editedStart.toLocalDate() != editedEnd!!.toLocalDate()
+            if (isOvernight && editedEnd != null && editedEnd!!.isAfter(editedStart)) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(spacing.small),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.small)
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Phiên kéo dài qua nửa đêm. Thời lượng sẽ được tự động phân bổ chính xác theo từng ngày trên Nhật ký và Thống kê.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
+
 
             OutlinedTextField(
                 value = note,
@@ -179,7 +282,7 @@ fun SessionBottomSheet(
                     onClick = {
                         val finalStart = editedStart.atZone(ZoneId.systemDefault()).toInstant()
                         val finalEnd = editedEnd?.atZone(ZoneId.systemDefault())?.toInstant()
-                        onSave(finalStart, finalEnd, note)
+                        dismissSmoothly { onSave(finalStart, finalEnd, note) }
                     },
                     enabled = !isError,
                     modifier = Modifier.weight(1.4f)
@@ -194,7 +297,7 @@ fun SessionBottomSheet(
             message = "Bạn có chắc chắn muốn xóa phiên ghi nhận này không? Thao tác này không thể hoàn tác.",
             onConfirm = {
                 showDeleteConfirmDialog = false
-                onDelete()
+                dismissSmoothly { onDelete() }
             },
             onDismiss = { showDeleteConfirmDialog = false },
             confirmText = "Xóa",
@@ -208,34 +311,57 @@ fun SessionBottomSheet(
             initialSplitTime = initialSplitLocal,
             onConfirm = { splitInstant ->
                 showSplitDialog = false
-                onSplit(splitInstant)
+                dismissSmoothly { onSplit(splitInstant) }
             },
             onDismiss = { showSplitDialog = false }
         )
     }
 
+    if (showStartDatePicker) {
+        LogAppDatePickerDialog(
+            initialDate = editedStart.toLocalDate(),
+            onConfirm = { newDate ->
+                editedStart = editedStart.withYear(newDate.year).withMonth(newDate.monthValue).withDayOfMonth(newDate.dayOfMonth)
+                showStartDatePicker = false
+            },
+            onDismiss = { showStartDatePicker = false }
+        )
+    }
+
     if (showStartTimePicker) {
-        TimePickerDialogWrapper(
-            initialTime = editedStart,
+        LogAppTimePickerDialog(
+            initialTime = editedStart.toLocalTime(),
             onConfirm = { newTime ->
-                editedStart = newTime
+                editedStart = editedStart.withHour(newTime.hour).withMinute(newTime.minute)
                 showStartTimePicker = false
             },
             onDismiss = { showStartTimePicker = false }
         )
     }
 
+    if (showEndDatePicker && editedEnd != null) {
+        LogAppDatePickerDialog(
+            initialDate = editedEnd!!.toLocalDate(),
+            onConfirm = { newDate ->
+                editedEnd = editedEnd!!.withYear(newDate.year).withMonth(newDate.monthValue).withDayOfMonth(newDate.dayOfMonth)
+                showEndDatePicker = false
+            },
+            onDismiss = { showEndDatePicker = false }
+        )
+    }
+
     if (showEndTimePicker && editedEnd != null) {
-        TimePickerDialogWrapper(
-            initialTime = editedEnd!!,
+        LogAppTimePickerDialog(
+            initialTime = editedEnd!!.toLocalTime(),
             onConfirm = { newTime ->
-                editedEnd = newTime
+                editedEnd = editedEnd!!.withHour(newTime.hour).withMinute(newTime.minute)
                 showEndTimePicker = false
             },
             onDismiss = { showEndTimePicker = false }
         )
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

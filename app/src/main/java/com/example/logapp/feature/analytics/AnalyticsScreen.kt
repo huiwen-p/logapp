@@ -659,9 +659,11 @@ private fun ActivityBreakdownCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
+            val activityMap = remember(activities) { activities.associateBy { it.id } }
+
             Column(verticalArrangement = Arrangement.spacedBy(spacing.medium)) {
                 activityDurations.entries.sortedByDescending { it.value }.forEach { (activityId, duration) ->
-                    val activity = activities.find { it.id == activityId }
+                    val activity = activityMap[activityId]
                     val color = activity?.color?.let { Color(it.toInt()) } ?: MaterialTheme.colorScheme.primary
                     val fraction = if (totalDuration.inWholeMilliseconds > 0) {
                         duration.inWholeMilliseconds.toFloat() / totalDuration.inWholeMilliseconds

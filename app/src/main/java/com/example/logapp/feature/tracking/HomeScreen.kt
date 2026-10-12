@@ -127,9 +127,11 @@ fun HomeScreen(
                         )
                     }
 
+                    val activitiesMap = remember(activities) { activities.associateBy { it.id } }
+
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
                         activeSessions.forEach { session ->
-                            val activity = activities.find { it.id == session.activityId }
+                            val activity = activitiesMap[session.activityId]
                             val activityName = activity?.name ?: "Chưa xác định"
                             ActiveSessionItem(
                                 session = session,
@@ -263,15 +265,23 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // Regular Activity Grid
+                // Regular Activity Grid with O(1) running set lookup and item recycling
+                val runningActivityIds = remember(activeSessions) {
+                    activeSessions.map { it.activityId }.toSet()
+                }
+
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(3),
                     horizontalArrangement = Arrangement.spacedBy(spacing.small),
                     verticalArrangement = Arrangement.spacedBy(spacing.small),
                     modifier = Modifier.weight(1f)
                 ) {
-                    items(filteredActivities, key = { it.id }) { activity ->
-                        val isRunning = activeSessions.any { it.activityId == activity.id }
+                    items(
+                        items = filteredActivities,
+                        key = { it.id },
+                        contentType = { "activity_card" }
+                    ) { activity ->
+                        val isRunning = runningActivityIds.contains(activity.id)
                         ActivityCard(
                             name = activity.name,
                             color = activity.color,

@@ -22,10 +22,12 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import androidx.compose.runtime.Immutable
 import javax.inject.Inject
 
 enum class AnalyticsTab { DAILY, WEEKLY, MONTHLY }
 
+@Immutable
 data class AnalyticsUiState(
     val selectedTab: AnalyticsTab = AnalyticsTab.DAILY,
     val selectedDate: LocalDate = LocalDate.now(),
@@ -50,17 +52,15 @@ class AnalyticsViewModel @Inject constructor(
     val uiState: StateFlow<AnalyticsUiState> = combine(
         sessionRepository.getAllSessions(),
         activityRepository.getAllActivities(),
-        preferencesManager.dayBoundary,
         _selectedTab,
         _selectedDate
-    ) { sessions, activities, boundaryStr, tab, date ->
+    ) { sessions, activities, tab, date ->
         try {
-            val (hours, minutes) = PreferencesManager.parseDayBoundary(boundaryStr)
             val zone = ZoneId.systemDefault()
             val now = Instant.now()
             
-            val startOfDay = date.atTime(hours, minutes).atZone(zone).toInstant()
-            val endOfDay = date.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
+            val startOfDay = date.atStartOfDay(zone).toInstant()
+            val endOfDay = date.plusDays(1).atStartOfDay(zone).toInstant()
 
             var dailyAnalytics: DailyAnalytics? = null
             var weeklyAnalytics: WeeklyAnalytics? = null
@@ -72,8 +72,8 @@ class AnalyticsViewModel @Inject constructor(
                 val weekStart = date.minusDays((date.dayOfWeek.value - 1).toLong()) // Monday
                 val boundaries = (0..6).associate { i ->
                     val day = weekStart.plusDays(i.toLong())
-                    val dStart = day.atTime(hours, minutes).atZone(zone).toInstant()
-                    val dEnd = day.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
+                    val dStart = day.atStartOfDay(zone).toInstant()
+                    val dEnd = day.plusDays(1).atStartOfDay(zone).toInstant()
                     day to Pair(dStart, dEnd)
                 }
                 weeklyAnalytics = AnalyticsEngine.calculateWeeklyAnalytics(sessions, now, boundaries)
@@ -82,8 +82,8 @@ class AnalyticsViewModel @Inject constructor(
                 val lengthOfMonth = yearMonth.lengthOfMonth()
                 val boundaries = (1..lengthOfMonth).associate { i ->
                     val day = yearMonth.atDay(i)
-                    val dStart = day.atTime(hours, minutes).atZone(zone).toInstant()
-                    val dEnd = day.plusDays(1).atTime(hours, minutes).atZone(zone).toInstant()
+                    val dStart = day.atStartOfDay(zone).toInstant()
+                    val dEnd = day.plusDays(1).atStartOfDay(zone).toInstant()
                     day to Pair(dStart, dEnd)
                 }
                 monthlyAnalytics = AnalyticsEngine.calculateMonthlyAnalytics(sessions, now, yearMonth, boundaries)

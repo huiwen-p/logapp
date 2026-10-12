@@ -17,16 +17,24 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.Instant
+import androidx.compose.runtime.Immutable
 import javax.inject.Inject
 import java.time.LocalDate
 import java.time.ZoneId
 import com.example.logapp.data.datastore.PreferencesManager
 
+enum class TimelineViewMode {
+    CANVAS,
+    LIST
+}
+
+@Immutable
 data class TimelineUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val sessions: List<ActivitySessionEntity> = emptyList(),
     val activities: List<ActivityEntity> = emptyList(),
     val dailyAnalytics: DailyAnalytics? = null,
+    val viewMode: TimelineViewMode = TimelineViewMode.CANVAS,
     val isLoading: Boolean = false,
     val errorMessage: String? = null
 )
@@ -44,6 +52,9 @@ class TimelineViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _selectedDate = MutableStateFlow(LocalDate.now())
+    private val _viewMode = MutableStateFlow(TimelineViewMode.CANVAS)
+    val viewMode: StateFlow<TimelineViewMode> = _viewMode.asStateFlow()
+
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
@@ -51,16 +62,23 @@ class TimelineViewModel @Inject constructor(
         _userMessage.value = null
     }
 
+    fun toggleViewMode() {
+        _viewMode.value = if (_viewMode.value == TimelineViewMode.CANVAS) TimelineViewMode.LIST else TimelineViewMode.CANVAS
+    }
+
+    fun setViewMode(mode: TimelineViewMode) {
+        _viewMode.value = mode
+    }
+
     val uiState: StateFlow<TimelineUiState> = combine(
         sessionRepository.getAllSessions(),
         activityRepository.getAllActivities(),
         _selectedDate,
-        preferencesManager.dayBoundary
-    ) { sessions, activities, date, boundaryStr ->
-        val (hours, minutes) = PreferencesManager.parseDayBoundary(boundaryStr)
-        
-        val startOfDay = date.atTime(hours, minutes).atZone(ZoneId.systemDefault()).toInstant()
-        val endOfDay = date.plusDays(1).atTime(hours, minutes).atZone(ZoneId.systemDefault()).toInstant()
+        _viewMode
+    ) { sessions, activities, date, mode ->
+        val zone = ZoneId.systemDefault()
+        val startOfDay = date.atStartOfDay(zone).toInstant()
+        val endOfDay = date.plusDays(1).atStartOfDay(zone).toInstant()
         
         val dailySessions = sessions.filter {
             val s = it.startedAt
@@ -74,6 +92,7 @@ class TimelineViewModel @Inject constructor(
             sessions = dailySessions,
             activities = activities,
             dailyAnalytics = analytics,
+            viewMode = mode,
             isLoading = false,
             errorMessage = null
         )

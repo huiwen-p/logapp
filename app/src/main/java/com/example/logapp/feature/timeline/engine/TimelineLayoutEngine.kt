@@ -1,11 +1,13 @@
 package com.example.logapp.feature.timeline.engine
 
+import androidx.compose.runtime.Immutable
 import com.example.logapp.data.local.entity.ActivitySessionEntity
 import java.time.Instant
 
 /**
  * Layout information for a session on the timeline canvas.
  */
+@Immutable
 data class SessionLayoutPosition(
     val session: ActivitySessionEntity,
     val columnIndex: Int,
@@ -97,11 +99,15 @@ object TimelineLayoutEngine {
 
             for (session in cluster) {
                 val colIndex = sessionColMap[session.id] ?: 0
-                val overlapsWithAny = cluster.any { other ->
-                    if (other.id == session.id) return@any false
-                    val sEnd = session.endedAt ?: referenceTime
-                    val oEnd = other.endedAt ?: referenceTime
-                    session.startedAt.isBefore(oEnd) && other.startedAt.isBefore(sEnd)
+                val overlapsWithAny = if (totalClusterColumns <= 1) {
+                    false
+                } else {
+                    cluster.any { other ->
+                        if (other.id == session.id) return@any false
+                        val sEnd = session.endedAt ?: referenceTime
+                        val oEnd = other.endedAt ?: referenceTime
+                        session.startedAt.isBefore(oEnd) && other.startedAt.isBefore(sEnd)
+                    }
                 }
 
                 result[session.id] = SessionLayoutPosition(

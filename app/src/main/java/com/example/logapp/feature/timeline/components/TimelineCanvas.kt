@@ -61,8 +61,51 @@ fun TimelineCanvas(
         }
     }
 
-    // To store rendered rectangles for tap detection
-    val renderedBlocks = remember { mutableStateListOf<Pair<Rect, ActivitySessionEntity>>() }
+    // Pre-measure static badges to eliminate text measurement inside 60fps draw loop
+    val prevDayBadge = remember(textMeasurer) {
+        textMeasurer.measure(
+            text = "↰ từ hôm trước",
+            style = TextStyle(
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+    }
+    val nextDayBadge = remember(textMeasurer) {
+        textMeasurer.measure(
+            text = "sang hôm sau 🌙",
+            style = TextStyle(
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+    }
+    val overlapSymbol = remember(textMeasurer) {
+        textMeasurer.measure(
+            text = "⇄",
+            style = TextStyle(
+                color = Color.White.copy(alpha = 0.9f),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        )
+    }
+
+    // Memoize activities map for O(1) lookup during drawing
+    val activityMap = remember(activities) {
+        activities.associateBy { it.id }
+    }
+
+    // Memory cache for session title layouts to eliminate allocations during continuous pan/zoom
+    val textLayoutCache = remember { mutableMapOf<Triple<String, Int, Boolean>, androidx.compose.ui.text.TextLayoutResult>() }
+    LaunchedEffect(activities) {
+        textLayoutCache.clear()
+    }
+
+    // Plain mutable list for gesture hit testing (avoids SnapshotStateList overhead in DrawScope)
+    val renderedBlocks = remember { mutableListOf<Pair<Rect, ActivitySessionEntity>>() }
 
     // Cluster-based Overlap layout logic: Isolated sessions get 100% width, overlapping clusters divide width
     val layoutMap = remember(sessions) {
@@ -175,7 +218,7 @@ fun TimelineCanvas(
         // Draw Blocks
         clipRect(left = timeAxisWidth, top = 0f, right = canvasWidth, bottom = canvasHeight) {
             sortedSessions.forEach { session ->
-                val activity = activities.find { it.id == session.activityId }
+                val activity = activityMap[session.activityId]
                 val color = activity?.color?.let { Color(it.toInt()) } ?: Color(0xFF6750A4)
 
                 val startMilli = maxOf(startOfDayMillis, session.startedAt.toEpochMilli())
@@ -185,7 +228,7 @@ fun TimelineCanvas(
                 val endY = ((endMilli - startOfDayMillis).toFloat() / oneDayMillis) * canvasHeight * scaleY + offsetY
 
                 // Culling: Skip if block is entirely outside visible bounds
-                if (endY < -100f || startY > canvasHeight + 100f) {
+                if (endY < -50f || startY > canvasHeight + 50f) {
                     return@forEach
                 }
 
@@ -201,6 +244,12 @@ fun TimelineCanvas(
                 val x = timeAxisWidth + 8f + colIndex * colWidth
                 val blockWidth = (colWidth - 4f).coerceAtLeast(16f)
 
+                val startsFromPreviousDay = session.startedAt.toEpochMilli() < startOfDayMillis
+                val continuesToNextDay = (session.endedAt?.toEpochMilli() ?: now.toEpochMilli()) > (startOfDayMillis + oneDayMillis)
+
+                val topRadius = if (startsFromPreviousDay) 0f else 14f
+                val bottomRadius = if (continuesToNextDay) 0f else 14f
+
                 val rect = Rect(Offset(x, startY), Size(blockWidth, height))
                 renderedBlocks.add(Pair(rect, session))
 
@@ -209,7 +258,7 @@ fun TimelineCanvas(
                     color = color.copy(alpha = 0.90f),
                     topLeft = Offset(x, startY),
                     size = Size(blockWidth, height),
-                    cornerRadius = CornerRadius(14f, 14f)
+                    cornerRadius = CornerRadius(topRadius, topRadius)
                 )
 
                 // Block subtle outline
@@ -217,9 +266,27 @@ fun TimelineCanvas(
                     color = Color.White.copy(alpha = 0.18f),
                     topLeft = Offset(x, startY),
                     size = Size(blockWidth, height),
-                    cornerRadius = CornerRadius(14f, 14f),
+                    cornerRadius = CornerRadius(topRadius, topRadius),
                     style = Stroke(width = 1.dp.toPx())
                 )
+
+                // Overnight continuation indicators (using pre-measured static badges)
+                if (startsFromPreviousDay && blockWidth > 70f && height > 20f) {
+                    drawText(
+                        textLayoutResult = prevDayBadge,
+                        topLeft = Offset(x + blockWidth - prevDayBadge.size.width - 6f, startY + 3f)
+                    )
+                }
+
+                if (continuesToNextDay && blockWidth > 70f && height > 20f) {
+                    val badgeY = startY + height - nextDayBadge.size.height - 3f
+                    if (badgeY > startY) {
+                        drawText(
+                            textLayoutResult = nextDayBadge,
+                            topLeft = Offset(x + blockWidth - nextDayBadge.size.width - 6f, badgeY)
+                        )
+                    }
+                }
 
                 // Visual cue for overlap: subtle dashed indicator + icon cue
                 if (isOverlapping) {
@@ -233,14 +300,6 @@ fun TimelineCanvas(
 
                     // Overlap visual cue symbol (⇄) in top right if block is large enough
                     if (blockWidth > 70f && height > 28f) {
-                        val overlapSymbol = textMeasurer.measure(
-                            text = "⇄",
-                            style = TextStyle(
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        )
                         val symbolX = x + blockWidth - overlapSymbol.size.width - 8f
                         val symbolY = startY + 6f
                         if (symbolX > x && symbolY + overlapSymbol.size.height < startY + height) {
@@ -271,17 +330,21 @@ fun TimelineCanvas(
                     val maxTextWidth = (blockWidth - (if (isOverlapping) 34f else 20f)).toInt().coerceAtLeast(0)
 
                     if (maxTextWidth > 0 && textTopLeftY in -40f..canvasHeight && textTopLeftX in 0f..canvasWidth) {
-                        val textLayoutResult = textMeasurer.measure(
-                            text = activityName,
-                            style = TextStyle(
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = if (height > 50f) 13.sp else 11.sp
-                            ),
-                            overflow = TextOverflow.Ellipsis,
-                            maxLines = 1,
-                            constraints = Constraints(maxWidth = maxTextWidth)
-                        )
+                        val isBig = height > 50f
+                        val cacheKey = Triple(activityName, maxTextWidth, isBig)
+                        val textLayoutResult = textLayoutCache.getOrPut(cacheKey) {
+                            textMeasurer.measure(
+                                text = activityName,
+                                style = TextStyle(
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = if (isBig) 13.sp else 11.sp
+                                ),
+                                overflow = TextOverflow.Ellipsis,
+                                maxLines = 1,
+                                constraints = Constraints(maxWidth = maxTextWidth)
+                            )
+                        }
                         drawText(
                             textLayoutResult = textLayoutResult,
                             topLeft = Offset(textTopLeftX, textTopLeftY)

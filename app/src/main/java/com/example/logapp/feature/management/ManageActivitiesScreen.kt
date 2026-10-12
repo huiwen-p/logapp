@@ -288,7 +288,11 @@ fun ManageActivitiesScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(spacing.small)
                     ) {
-                        items(reorderableList, { it.id }) { item ->
+                        items(
+                            items = reorderableList,
+                            key = { it.id },
+                            contentType = { "activity_row" }
+                        ) { item ->
                             ReorderableItem(state, key = item.id) { isDragging ->
                                 val elevation = if (isDragging) 8.dp else 1.dp
                                 Card(
@@ -353,7 +357,11 @@ fun ManageActivitiesScreen(
                         ),
                         verticalArrangement = Arrangement.spacedBy(spacing.small)
                     ) {
-                        items(archivedActivities, { it.id }) { item ->
+                        items(
+                            items = archivedActivities,
+                            key = { it.id },
+                            contentType = { "archived_activity_row" }
+                        ) { item ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(16.dp),

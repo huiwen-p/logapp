@@ -1,5 +1,8 @@
 package com.example.logapp.domain.backup
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class DriveBackupFile(val id: String, val name: String, val createdTime: Long)
 
 interface DriveBackupManager {

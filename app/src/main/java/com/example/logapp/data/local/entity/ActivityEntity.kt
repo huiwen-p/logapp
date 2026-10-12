@@ -1,11 +1,13 @@
 package com.example.logapp.data.local.entity
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.Instant
 import java.util.UUID
 
+@Immutable
 @Entity(
     tableName = "activities",
     indices = [

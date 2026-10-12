@@ -3,8 +3,10 @@ package com.example.logapp.feature.timeline
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -95,6 +97,23 @@ fun TimelineScreen(
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.headlineMedium
                         )
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.toggleViewMode() }) {
+                            if (state.viewMode == TimelineViewMode.CANVAS) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.List,
+                                    contentDescription = "Chuyển sang xem danh sách",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.DateRange,
+                                    contentDescription = "Chuyển sang xem biểu đồ",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                     }
                 )
             }
@@ -234,52 +253,66 @@ fun TimelineScreen(
                 )
             }
 
-            // Timeline Canvas, Loading Skeleton, or Empty State
+            // Timeline Canvas or Virtualized Session List (LazyColumn), Loading Skeleton, or Empty State
             Box(modifier = Modifier.weight(1f)) {
                 if (state.isLoading && state.sessions.isEmpty()) {
                     SkeletonTimeline(modifier = Modifier.fillMaxSize())
+                } else if (state.sessions.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = spacing.large)
+                    ) {
+                        LogAppEmptyState(
+                            title = "Chưa có phiên nhật ký nào",
+                            message = "Ngày này chưa có hoạt động nào được ghi nhận. Bạn có thể thêm thủ công hoặc bắt đầu ghi nhận từ màn hình Theo dõi.",
+                            primaryButtonText = "Thêm phiên thủ công",
+                            onPrimaryClick = { showCreateSession = true },
+                            secondaryButtonText = if (state.selectedDate != LocalDate.now()) "Quay về Hôm nay" else null,
+                            onSecondaryClick = { viewModel.jumpToToday() }
+                        )
+                    }
                 } else {
-                    com.example.logapp.feature.timeline.components.TimelineCanvas(
-                        selectedDate = state.selectedDate,
-                        sessions = state.sessions,
-                        activities = state.activities,
-                        onSessionClick = { session ->
-                            if (isMultiSelectMode) {
-                                if (selectedSessionIds.contains(session.id)) {
-                                    selectedSessionIds = selectedSessionIds - session.id
-                                    if (selectedSessionIds.isEmpty()) isMultiSelectMode = false
-                                } else {
-                                    if (selectedSessionIds.size < 2) {
-                                        selectedSessionIds = selectedSessionIds + session.id
-                                    }
-                                }
+                    val onSessionClickAction = { session: ActivitySessionEntity ->
+                        if (isMultiSelectMode) {
+                            if (selectedSessionIds.contains(session.id)) {
+                                selectedSessionIds = selectedSessionIds - session.id
+                                if (selectedSessionIds.isEmpty()) isMultiSelectMode = false
                             } else {
-                                selectedSession = session
+                                if (selectedSessionIds.size < 2) {
+                                    selectedSessionIds = selectedSessionIds + session.id
+                                }
                             }
-                        },
-                        onSessionLongClick = { session ->
-                            isMultiSelectMode = true
-                            selectedSessionIds = setOf(session.id)
-                        },
-                        selectedSessionIds = selectedSessionIds,
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    if (state.sessions.isEmpty() && !state.isLoading) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(horizontal = spacing.large)
-                        ) {
-                            LogAppEmptyState(
-                                title = "Chưa có phiên nhật ký nào",
-                                message = "Ngày này chưa có hoạt động nào được ghi nhận. Bạn có thể thêm thủ công hoặc bắt đầu ghi nhận từ màn hình Theo dõi.",
-                                primaryButtonText = "Thêm phiên thủ công",
-                                onPrimaryClick = { showCreateSession = true },
-                                secondaryButtonText = if (state.selectedDate != LocalDate.now()) "Quay về Hôm nay" else null,
-                                onSecondaryClick = { viewModel.jumpToToday() }
-                            )
+                        } else {
+                            selectedSession = session
                         }
+                    }
+
+                    val onSessionLongClickAction = { session: ActivitySessionEntity ->
+                        isMultiSelectMode = true
+                        selectedSessionIds = setOf(session.id)
+                    }
+
+                    if (state.viewMode == TimelineViewMode.CANVAS) {
+                        com.example.logapp.feature.timeline.components.TimelineCanvas(
+                            selectedDate = state.selectedDate,
+                            sessions = state.sessions,
+                            activities = state.activities,
+                            onSessionClick = onSessionClickAction,
+                            onSessionLongClick = onSessionLongClickAction,
+                            selectedSessionIds = selectedSessionIds,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        com.example.logapp.feature.timeline.components.SessionListLazyColumn(
+                            sessions = state.sessions,
+                            activities = state.activities,
+                            selectedSessionIds = selectedSessionIds,
+                            isMultiSelectMode = isMultiSelectMode,
+                            onSessionClick = onSessionClickAction,
+                            onSessionLongClick = onSessionLongClickAction,
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
                 }
             }
@@ -320,6 +353,7 @@ fun TimelineScreen(
         if (showCreateSession) {
             CreateSessionBottomSheet(
                 activities = state.activities,
+                selectedDate = state.selectedDate,
                 onDismiss = { showCreateSession = false },
                 onSave = { activityId, start, end, note ->
                     viewModel.createManualSession(activityId, start, end, note)

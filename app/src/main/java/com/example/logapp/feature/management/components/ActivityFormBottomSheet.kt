@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,9 +50,22 @@ fun ActivityFormBottomSheet(
         if (name.isNotBlank()) onValidateName(activity?.id, name) else null
     }
 
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+    var isDismissing by remember { mutableStateOf(false) }
+
+    fun dismissSmoothly(action: () -> Unit = onDismiss) {
+        if (isDismissing) return
+        isDismissing = true
+        coroutineScope.launch {
+            sheetState.hide()
+            action()
+        }
+    }
+
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        onDismissRequest = { dismissSmoothly() },
+        sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
@@ -63,7 +77,7 @@ fun ActivityFormBottomSheet(
             LogAppBottomSheetHeader(
                 title = if (activity == null) "Thêm hoạt động mới" else "Chỉnh sửa hoạt động",
                 subtitle = "Tùy chỉnh tên, màu sắc nhận diện và biểu tượng",
-                onClose = onDismiss
+                onClose = { dismissSmoothly() }
             )
 
             Column(
@@ -213,7 +227,9 @@ fun ActivityFormBottomSheet(
                     enabled = name.isNotBlank() && validationError == null,
                     onClick = {
                         if (name.isNotBlank() && validationError == null) {
-                            onSave(name.trim(), selectedColor.toArgb().toLong(), selectedIcon)
+                            dismissSmoothly {
+                                onSave(name.trim(), selectedColor.toArgb().toLong(), selectedIcon)
+                            }
                         }
                     }
                 )
@@ -223,12 +239,12 @@ fun ActivityFormBottomSheet(
                     if (activity.isArchived) {
                         LogAppSecondaryButton(
                             text = "Khôi phục hoạt động (Unarchive)",
-                            onClick = { onUnarchive(activity.id) }
+                            onClick = { dismissSmoothly { onUnarchive(activity.id) } }
                         )
                     } else {
                         LogAppSecondaryButton(
                             text = "Lưu trữ hoạt động (Archive)",
-                            onClick = { onArchive(activity.id) }
+                            onClick = { dismissSmoothly { onArchive(activity.id) } }
                         )
                     }
 
@@ -236,7 +252,7 @@ fun ActivityFormBottomSheet(
                     LogAppDangerButton(
                         text = "Xóa hoạt động",
                         icon = Icons.Default.Delete,
-                        onClick = { onDelete(activity.id) }
+                        onClick = { dismissSmoothly { onDelete(activity.id) } }
                     )
                 }
             }
@@ -250,10 +266,16 @@ private fun LiveActivityPreview(
     color: Color,
     icon: String?
 ) {
+    val animatedColor by androidx.compose.animation.animateColorAsState(
+        targetValue = color,
+        animationSpec = androidx.compose.animation.core.tween(250),
+        label = "previewColor"
+    )
+
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = color.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, color.copy(alpha = 0.3f)),
+        color = animatedColor.copy(alpha = 0.12f),
+        border = BorderStroke(1.dp, animatedColor.copy(alpha = 0.3f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -266,7 +288,7 @@ private fun LiveActivityPreview(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(CircleShape)
-                    .background(color.copy(alpha = 0.25f)),
+                    .background(animatedColor.copy(alpha = 0.25f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (!icon.isNullOrBlank()) {
@@ -276,7 +298,7 @@ private fun LiveActivityPreview(
                         text = name.take(1).uppercase().ifBlank { "?" },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = color
+                        color = animatedColor
                     )
                 }
             }

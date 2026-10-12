@@ -1,11 +1,13 @@
 package com.example.logapp.domain.engine
 
+import androidx.compose.runtime.Immutable
 import com.example.logapp.data.local.entity.ActivitySessionEntity
 import com.example.logapp.domain.model.TimelineSegment
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
+@Immutable
 data class DailyAnalytics(
     val uniqueClockDuration: Duration,
     val trackedDuration: Duration,
@@ -16,6 +18,7 @@ data class DailyAnalytics(
     val timelineSegments: List<TimelineSegment>
 )
 
+@Immutable
 data class WeeklyAnalytics(
     val startDate: java.time.LocalDate,
     val endDate: java.time.LocalDate,
@@ -26,6 +29,7 @@ data class WeeklyAnalytics(
     val activityRelationships: Map<Pair<String, String>, Duration>
 )
 
+@Immutable
 data class MonthlyAnalytics(
     val yearMonth: java.time.YearMonth,
     val totalUniqueDuration: Duration,

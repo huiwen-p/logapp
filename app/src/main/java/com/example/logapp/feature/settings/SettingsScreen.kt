@@ -43,7 +43,6 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val themeMode by viewModel.themeMode.collectAsState()
-    val dayBoundary by viewModel.dayBoundary.collectAsState()
     val isDriveSignedIn by viewModel.isDriveSignedIn.collectAsState()
     val driveBackups by viewModel.driveBackups.collectAsState()
     val isLoadingDriveBackups by viewModel.isLoadingDriveBackups.collectAsState()
@@ -64,7 +63,6 @@ fun SettingsScreen(
     val isRepairingHealth by viewModel.isRepairingHealth.collectAsState()
 
     var showDriveBackupsDialog by remember { mutableStateOf(false) }
-    var showTimePickerDialog by remember { mutableStateOf(false) }
     val importPreviewData by viewModel.importPreviewData.collectAsState()
     val context = LocalContext.current
 
@@ -563,27 +561,6 @@ fun SettingsScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(spacing.medium))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(spacing.medium))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Mốc bắt đầu ngày mới", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(
-                            "Các hoạt động đêm khuya trước mốc này vẫn tính vào ngày hôm trước.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Button(onClick = { showTimePickerDialog = true }) {
-                        Text(dayBoundary)
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(spacing.extraLarge))
@@ -673,57 +650,4 @@ fun SettingsScreen(
             onConfirm = { strategy -> viewModel.confirmImport(strategy) }
         )
     }
-
-    // Day Boundary Time Picker Dialog
-    if (showTimePickerDialog) {
-        val (currentHour, currentMinute) = PreferencesManager.parseDayBoundary(dayBoundary)
-        DayBoundaryTimePickerDialog(
-            initialHour = currentHour,
-            initialMinute = currentMinute,
-            onConfirm = { hour, minute ->
-                val formatted = String.format("%02d:%02d", hour, minute)
-                viewModel.setDayBoundary(formatted)
-                showTimePickerDialog = false
-            },
-            onDismiss = { showTimePickerDialog = false }
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DayBoundaryTimePickerDialog(
-    initialHour: Int,
-    initialMinute: Int,
-    onConfirm: (Int, Int) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val state = rememberTimePickerState(
-        initialHour = initialHour,
-        initialMinute = initialMinute,
-        is24Hour = true
-    )
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Chọn mốc bắt đầu ngày mới") },
-        text = {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                TimePicker(state = state)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onConfirm(state.hour, state.minute)
-            }) {
-                Text("Xác nhận")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Hủy") }
-        }
-    )
 }

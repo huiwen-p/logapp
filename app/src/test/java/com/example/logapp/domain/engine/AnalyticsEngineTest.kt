@@ -4,6 +4,7 @@ import com.example.logapp.data.local.entity.ActivitySessionEntity
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
+import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.milliseconds
 
 class AnalyticsEngineTest {
@@ -117,6 +118,43 @@ class AnalyticsEngineTest {
         // Session C remains 05:00 - 06:00 (1 hour).
         // Total tracked duration should be 2 hours.
         assertEquals((2 * 60 * 60 * 1000L).milliseconds, analytics.trackedDuration)
+    }
+
+    @Test
+    fun testOvernightSessionTruncationAcrossMidnight() {
+        // Fix bug from 23:00 (Oct 11) to 02:00 (Oct 12) = 3 hours
+        val session = createSession("session1", "Coding", "2026-10-11T23:00:00Z", "2026-10-12T02:00:00Z")
+
+        val day1Start = Instant.parse("2026-10-11T00:00:00Z")
+        val day1End = Instant.parse("2026-10-12T00:00:00Z")
+
+        val day2Start = Instant.parse("2026-10-12T00:00:00Z")
+        val day2End = Instant.parse("2026-10-13T00:00:00Z")
+
+        val day1Analytics = AnalyticsEngine.calculateDailyAnalytics(
+            listOf(session),
+            Instant.parse("2026-10-13T00:00:00Z"),
+            day1Start,
+            day1End
+        )
+
+        val day2Analytics = AnalyticsEngine.calculateDailyAnalytics(
+            listOf(session),
+            Instant.parse("2026-10-13T00:00:00Z"),
+            day2Start,
+            day2End
+        )
+
+        // Day 1 gets 23:00 -> 24:00 (1 hour)
+        assertEquals(1.hours, day1Analytics.trackedDuration)
+        assertEquals(1.hours, day1Analytics.uniqueClockDuration)
+
+        // Day 2 gets 00:00 -> 02:00 (2 hours)
+        assertEquals(2.hours, day2Analytics.trackedDuration)
+        assertEquals(2.hours, day2Analytics.uniqueClockDuration)
+
+        // Total equals original 3 hours
+        assertEquals(3.hours, day1Analytics.trackedDuration + day2Analytics.trackedDuration)
     }
 
     @Test
