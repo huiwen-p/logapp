@@ -14,6 +14,7 @@ import com.example.logapp.domain.usecase.EditSessionUseCase
 import com.example.logapp.domain.usecase.SplitSessionUseCase
 import com.example.logapp.domain.usecase.MergeSessionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -97,6 +98,7 @@ class TimelineViewModel @Inject constructor(
             errorMessage = null
         )
     }
+    .flowOn(Dispatchers.Default)
     .catch { e ->
         emit(TimelineUiState(selectedDate = _selectedDate.value, isLoading = false, errorMessage = "Lỗi tải dữ liệu: ${e.localizedMessage ?: "Lỗi hệ thống"}"))
     }

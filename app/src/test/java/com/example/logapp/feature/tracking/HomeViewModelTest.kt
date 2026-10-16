@@ -162,4 +162,81 @@ class HomeViewModelTest {
         assertNull("Restored session should have null endedAt", slot.captured.endedAt)
         assertEquals("sess_1", slot.captured.id)
     }
+
+    @Test
+    fun testToggleActivity_whenNotRunning_startsActivity() = runTest {
+        val viewModel = HomeViewModel(
+            activityRepository,
+            sessionRepository,
+            startActivityUseCase,
+            stopActivityUseCase
+        )
+        backgroundScope.launch { viewModel.activeSessions.collect {} }
+        advanceUntilIdle()
+
+        viewModel.toggleActivity("1")
+        advanceUntilIdle()
+
+        coVerify { startActivityUseCase("1") }
+    }
+
+    @Test
+    fun testToggleActivity_whenRunning_stopsSession() = runTest {
+        val runningSession = ActivitySessionEntity(
+            id = "sess_active_1",
+            activityId = "1",
+            startedAt = now,
+            createdAt = now,
+            updatedAt = now
+        )
+        every { sessionRepository.getActiveSessions() } returns flowOf(listOf(runningSession))
+
+        val viewModel = HomeViewModel(
+            activityRepository,
+            sessionRepository,
+            startActivityUseCase,
+            stopActivityUseCase
+        )
+        backgroundScope.launch { viewModel.activeSessions.collect {} }
+        advanceUntilIdle()
+
+        viewModel.toggleActivity("1")
+        advanceUntilIdle()
+
+        coVerify { stopActivityUseCase(runningSession) }
+    }
+
+    @Test
+    fun testActivitiesPagingChunking_preservesManagementSortOrder() = runTest {
+        val manyActivities = (1..18).map { i ->
+            ActivityEntity(
+                id = "act_$i",
+                name = "Hoạt động $i",
+                sortOrder = i,
+                isArchived = false,
+                createdAt = now,
+                updatedAt = now
+            )
+        }
+        every { activityRepository.getAllActivities() } returns flowOf(manyActivities)
+
+        val viewModel = HomeViewModel(
+            activityRepository,
+            sessionRepository,
+            startActivityUseCase,
+            stopActivityUseCase
+        )
+        backgroundScope.launch { viewModel.filteredActivities.collect {} }
+        advanceUntilIdle()
+
+        val pages = viewModel.filteredActivities.value.chunked(8)
+        assertEquals(3, pages.size)
+        assertEquals(8, pages[0].size)
+        assertEquals(8, pages[1].size)
+        assertEquals(2, pages[2].size)
+        assertEquals("Hoạt động 1", pages[0][0].name)
+        assertEquals("Hoạt động 8", pages[0][7].name)
+        assertEquals("Hoạt động 9", pages[1][0].name)
+        assertEquals("Hoạt động 17", pages[2][0].name)
+    }
 }

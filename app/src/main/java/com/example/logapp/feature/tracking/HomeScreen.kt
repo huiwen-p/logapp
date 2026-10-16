@@ -6,9 +6,13 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -65,15 +69,29 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
+    // Single unified ticker for active sessions - only loops when sessions are actively running
+    val currentInstant by produceState(
+        initialValue = Instant.now(),
+        key1 = activeSessions.isNotEmpty()
+    ) {
+        if (activeSessions.isNotEmpty()) {
+            while (true) {
+                delay(1000L)
+                value = Instant.now()
+            }
+        }
+    }
+
     Scaffold(
         snackbarHost = { LogAppSnackbarHost(snackbarHostState) },
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = "TimeLens",
                         fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.displayMedium
+                        style = MaterialTheme.typography.headlineMedium
                     )
                 },
                 actions = {
@@ -99,129 +117,16 @@ fun HomeScreen(
                     title = "Không thể tải dữ liệu hoạt động",
                     message = errorMessage ?: "Đã xảy ra lỗi không xác định.",
                     onRetry = { viewModel.retry() },
-                    modifier = Modifier.padding(bottom = spacing.medium)
+                    modifier = Modifier.padding(bottom = spacing.small)
                 )
             }
 
-            // 1. Active Sessions Section
-            AnimatedVisibility(
-                visible = activeSessions.isNotEmpty(),
-                enter = expandVertically(animationSpec = tween(300)),
-                exit = shrinkVertically(animationSpec = tween(300))
-            ) {
-                Column(modifier = Modifier.padding(bottom = spacing.medium)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = spacing.small),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "ĐANG THEO DÕI",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        LogAppStatusBadge(
-                            status = StatusType.ACTIVE,
-                            text = "${activeSessions.size} đang chạy"
-                        )
-                    }
-
-                    val activitiesMap = remember(activities) { activities.associateBy { it.id } }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.small)) {
-                        activeSessions.forEach { session ->
-                            val activity = activitiesMap[session.activityId]
-                            val activityName = activity?.name ?: "Chưa xác định"
-                            ActiveSessionItem(
-                                session = session,
-                                activityName = activityName,
-                                activityColor = activity?.color,
-                                icon = activity?.icon,
-                                onStop = {
-                                    viewModel.stopSession(session)
-                                    coroutineScope.launch {
-                                        val result = snackbarHostState.showSnackbar(
-                                            message = "Đã dừng $activityName",
-                                            actionLabel = "Hoàn tác",
-                                            duration = SnackbarDuration.Short
-                                        )
-                                        if (result == SnackbarResult.ActionPerformed) {
-                                            viewModel.undoStopSession(session)
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 1.1 Motivating hint when user hasn't tracked anything today
-            if (activities.isNotEmpty() && activeSessions.isEmpty() && todaySessionsCount == 0 && !isLoading) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = spacing.small)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = spacing.medium, vertical = spacing.small),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.small)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Bạn chưa ghi nhận hoạt động nào hôm nay. Chạm một hoạt động bên dưới để bắt đầu!",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // 2. Quick Tracking Section Header
-            LogAppSectionHeader(
-                title = "QUICK TRACKING",
-                subtitle = "Chạm để bắt đầu ghi nhận ngay lập tức"
-            )
-
-            // Quick Search Bar (when there are 6+ activities or user is searching)
-            if (activities.size >= 6 || searchQuery.isNotBlank()) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { viewModel.onSearchQueryChange(it) },
-                    placeholder = { Text("Tìm nhanh hoạt động...") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = "Tìm kiếm")
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Xóa")
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = spacing.small)
-                )
-            }
-
-            // 3. Loading / Grid / Empty States
             if (isLoading && activities.isEmpty()) {
                 // Loading Skeleton State
                 SkeletonActivityGrid(
-                    itemCount = 6,
-                    modifier = Modifier.weight(1f)
+                    itemCount = 8,
+                    columns = 4,
+                    modifier = Modifier.padding(top = spacing.medium)
                 )
             } else if (activities.isEmpty()) {
                 // Edge Case 1: Empty State - No activities created yet
@@ -242,53 +147,244 @@ fun HomeScreen(
                         onSecondaryClick = { viewModel.addSampleActivities() }
                     )
                 }
-            } else if (filteredActivities.isEmpty() && searchQuery.isNotBlank()) {
-                // Edge Case 2: Empty Search Result
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(spacing.small)
+            } else {
+                // 1. QUICK TRACKING SECTION (Always on top with 4x2 Horizontal Pager)
+                LogAppSectionHeader(
+                    title = "QUICK TRACKING",
+                    subtitle = "Chạm để bắt đầu ghi nhận ngay lập tức"
+                )
+
+                // Quick Search Bar (when there are 8+ activities or user is searching)
+                if (activities.size >= 8 || searchQuery.isNotBlank()) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.onSearchQueryChange(it) },
+                        placeholder = { Text("Tìm nhanh hoạt động...") },
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = "Tìm kiếm")
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                    Icon(Icons.Default.Clear, contentDescription = "Xóa")
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = spacing.small)
+                    )
+                }
+
+                if (filteredActivities.isEmpty() && searchQuery.isNotBlank()) {
+                    // Empty Search Result
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = spacing.medium),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "Không tìm thấy hoạt động \"$searchQuery\"",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        TextButton(onClick = { viewModel.onSearchQueryChange("") }) {
-                            Text("Xem tất cả hoạt động", fontWeight = FontWeight.Bold)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(spacing.small)
+                        ) {
+                            Text(
+                                text = "Không tìm thấy hoạt động \"$searchQuery\"",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            TextButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                Text("Xem tất cả hoạt động", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                } else {
+                    // Paged Activity Grid: 4 columns x 2 rows (up to 8 items per page)
+                    val runningActivityIds = remember(activeSessions) {
+                        activeSessions.map { it.activityId }.toSet()
+                    }
+                    val pages = remember(filteredActivities) {
+                        filteredActivities.chunked(8)
+                    }
+                    val pagerState = rememberPagerState(pageCount = { pages.size })
+
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { pageIndex ->
+                            val pageActivities = pages.getOrNull(pageIndex) ?: emptyList()
+                            val rows = remember(pageActivities) { pageActivities.chunked(4) }
+
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(spacing.small)
+                            ) {
+                                rows.forEach { rowActivities ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.small)
+                                    ) {
+                                        rowActivities.forEach { activity ->
+                                            val isRunning = runningActivityIds.contains(activity.id)
+                                            ActivityCard(
+                                                name = activity.name,
+                                                color = activity.color,
+                                                icon = activity.icon,
+                                                isActive = isRunning,
+                                                onClick = { viewModel.toggleActivity(activity.id) },
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                        repeat(4 - rowActivities.size) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Page Indicator Dots
+                        if (pages.size > 1) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = spacing.small),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                repeat(pages.size) { iteration ->
+                                    val isSelected = pagerState.currentPage == iteration
+                                    val color = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                                    }
+                                    val width = if (isSelected) 16.dp else 6.dp
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(horizontal = 3.dp)
+                                            .clip(RoundedCornerShape(3.dp))
+                                            .background(color)
+                                            .size(width = width, height = 6.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-            } else {
-                // Regular Activity Grid with O(1) running set lookup and item recycling
-                val runningActivityIds = remember(activeSessions) {
-                    activeSessions.map { it.activityId }.toSet()
-                }
 
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.small),
-                    verticalArrangement = Arrangement.spacedBy(spacing.small),
-                    modifier = Modifier.weight(1f)
+                Spacer(modifier = Modifier.height(spacing.medium))
+
+                // 2. ACTIVE SESSIONS SECTION (Vertically scrollable in remaining space)
+                val activitiesMap = remember(activities) { activities.associateBy { it.id } }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
                 ) {
-                    items(
-                        items = filteredActivities,
-                        key = { it.id },
-                        contentType = { "activity_card" }
-                    ) { activity ->
-                        val isRunning = runningActivityIds.contains(activity.id)
-                        ActivityCard(
-                            name = activity.name,
-                            color = activity.color,
-                            icon = activity.icon,
-                            isActive = isRunning,
-                            onClick = { viewModel.startActivity(activity.id) }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = spacing.small),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "ĐANG THEO DÕI",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
+                        if (activeSessions.isNotEmpty()) {
+                            LogAppStatusBadge(
+                                status = StatusType.ACTIVE,
+                                text = "${activeSessions.size} đang chạy"
+                            )
+                        }
+                    }
+
+                    if (activeSessions.isNotEmpty()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(spacing.small),
+                            contentPadding = PaddingValues(bottom = spacing.medium)
+                        ) {
+                            items(
+                                items = activeSessions,
+                                key = { it.id }
+                            ) { session ->
+                                val activity = activitiesMap[session.activityId]
+                                val activityName = activity?.name ?: "Chưa xác định"
+                                ActiveSessionItem(
+                                    session = session,
+                                    activityName = activityName,
+                                    currentInstant = currentInstant,
+                                    activityColor = activity?.color,
+                                    icon = activity?.icon,
+                                    onStop = {
+                                        viewModel.stopSession(session)
+                                        coroutineScope.launch {
+                                            snackbarHostState.currentSnackbarData?.dismiss()
+                                            val result = snackbarHostState.showSnackbar(
+                                                message = "Đã dừng $activityName",
+                                                actionLabel = "Hoàn tác",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                            if (result == SnackbarResult.ActionPerformed) {
+                                                viewModel.undoStopSession(session)
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        // Empty Sessions State / Motivating Hint
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = spacing.small)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(spacing.medium),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(spacing.small)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = if (todaySessionsCount == 0) {
+                                            "Chưa có hoạt động nào đang chạy"
+                                        } else {
+                                            "Không có phiên nào đang chạy"
+                                        },
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = if (todaySessionsCount == 0) {
+                                            "Chạm một hoạt động ở trên để bắt đầu tính giờ!"
+                                        } else {
+                                            "Hôm nay bạn đã hoàn thành $todaySessionsCount phiên. Chạm ở trên để tiếp tục!"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -300,17 +396,13 @@ fun HomeScreen(
 fun ActiveSessionItem(
     session: ActivitySessionEntity,
     activityName: String,
+    currentInstant: Instant = Instant.now(),
     activityColor: Long? = null,
     icon: String? = null,
     onStop: () -> Unit
 ) {
-    var duration by remember { mutableStateOf(Duration.between(session.startedAt, Instant.now())) }
-
-    LaunchedEffect(session.startedAt) {
-        while (true) {
-            duration = Duration.between(session.startedAt, Instant.now())
-            delay(1000)
-        }
+    val duration = remember(session.startedAt, currentInstant) {
+        Duration.between(session.startedAt, currentInstant)
     }
 
     val hours = duration.toHours()

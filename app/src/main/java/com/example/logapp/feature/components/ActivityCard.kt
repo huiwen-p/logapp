@@ -57,7 +57,7 @@ fun ActivityCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                        .padding(6.dp)
                         .size(8.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFE53935))
@@ -67,13 +67,13 @@ fun ActivityCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(8.dp),
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
                         .background(iconColor.copy(alpha = 0.2f)),
                     contentAlignment = Alignment.Center
@@ -81,12 +81,12 @@ fun ActivityCard(
                     if (!icon.isNullOrBlank()) {
                         Text(
                             text = icon,
-                            fontSize = 20.sp
+                            fontSize = 18.sp
                         )
                     } else {
                         Text(
                             text = name.take(1).uppercase(),
-                            style = MaterialTheme.typography.titleMedium,
+                            style = MaterialTheme.typography.titleSmall,
                             color = iconColor,
                             fontWeight = FontWeight.Bold
                         )
@@ -94,15 +94,15 @@ fun ActivityCard(
                 }
                 Text(
                     text = name,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        lineHeight = 16.sp,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        lineHeight = 13.sp,
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium
                     ),
                     color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }

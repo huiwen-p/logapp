@@ -38,12 +38,14 @@ class SettingsViewModel @Inject constructor(
     private val driveBackupUseCase: DriveBackupUseCase,
     private val checkDataHealthUseCase: CheckDataHealthUseCase,
     private val repairDataHealthUseCase: RepairDataHealthUseCase,
-    private val syncMetadataRepository: SyncMetadataRepository
+    private val syncMetadataRepository: SyncMetadataRepository,
+    private val clearAllDataUseCase: ClearAllDataUseCase
 ) : ViewModel() {
 
     val dataHealthReport = MutableStateFlow<DataHealthReport?>(null)
     val isCheckingHealth = MutableStateFlow(false)
     val isRepairingHealth = MutableStateFlow(false)
+    val isClearingData = MutableStateFlow(false)
 
     val userMessage = MutableStateFlow<String?>(null)
     val isExporting = MutableStateFlow(false)
@@ -85,7 +87,7 @@ class SettingsViewModel @Inject constructor(
     val isLoadingDriveBackups = MutableStateFlow(false)
 
     init {
-        checkDataHealth()
+        checkDataHealth(silent = true)
         refreshPendingSyncs()
     }
 
@@ -103,15 +105,19 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun checkDataHealth() {
+    fun checkDataHealth(silent: Boolean = false) {
         viewModelScope.launch {
-            isCheckingHealth.value = true
+            if (!silent) {
+                isCheckingHealth.value = true
+            }
             try {
                 dataHealthReport.value = checkDataHealthUseCase()
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
-                isCheckingHealth.value = false
+                if (!silent) {
+                    isCheckingHealth.value = false
+                }
             }
         }
     }
@@ -127,6 +133,23 @@ class SettingsViewModel @Inject constructor(
                 userMessage.value = "Lỗi khi tự sửa lỗi dữ liệu: ${e.message}"
             } finally {
                 isRepairingHealth.value = false
+            }
+        }
+    }
+
+    fun clearAllData() {
+        viewModelScope.launch {
+            isClearingData.value = true
+            try {
+                clearAllDataUseCase()
+                checkDataHealth(silent = true)
+                refreshPendingSyncs()
+                userMessage.value = "Đã xóa toàn bộ dữ liệu trên thiết bị thành công"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                userMessage.value = "Lỗi khi xóa dữ liệu: ${e.localizedMessage ?: "Lỗi hệ thống"}"
+            } finally {
+                isClearingData.value = false
             }
         }
     }

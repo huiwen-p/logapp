@@ -15,6 +15,7 @@ import com.example.logapp.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -23,7 +24,7 @@ import java.time.Instant
 
 class SessionNotificationService : Service() {
 
-    private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
+    private val serviceScope = CoroutineScope(Dispatchers.Default + Job())
     private var timerJob: Job? = null
     
     private var sessionId: String? = null
@@ -124,6 +125,12 @@ class SessionNotificationService : Service() {
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopTimer()
+        serviceScope.cancel()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

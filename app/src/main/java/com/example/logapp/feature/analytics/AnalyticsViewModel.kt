@@ -11,10 +11,12 @@ import com.example.logapp.domain.repository.ActivityRepository
 import com.example.logapp.domain.repository.SessionRepository
 import com.example.logapp.data.datastore.PreferencesManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import java.time.Instant
@@ -108,7 +110,9 @@ class AnalyticsViewModel @Inject constructor(
                 errorMessage = "Không thể tính toán thống kê: ${e.localizedMessage ?: "Lỗi hệ thống"}"
             )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AnalyticsUiState(isLoading = true))
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AnalyticsUiState(isLoading = true))
 
     fun retry() {
         val current = _selectedDate.value

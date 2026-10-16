@@ -118,13 +118,41 @@ class HomeViewModel @Inject constructor(
         _searchQuery.value = newQuery
     }
 
-    fun startActivity(activityId: String) {
+    private var lastActionTimestamp = 0L
+
+    fun toggleActivity(activityId: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastActionTimestamp < 300L) return
+        lastActionTimestamp = now
+
         viewModelScope.launch {
-            startActivityUseCase(activityId)
+            val runningSession = activeSessions.value.find { it.activityId == activityId }
+            if (runningSession != null) {
+                stopActivityUseCase(runningSession)
+            } else {
+                startActivityUseCase(activityId)
+            }
+        }
+    }
+
+    fun startActivity(activityId: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastActionTimestamp < 300L) return
+        lastActionTimestamp = now
+
+        viewModelScope.launch {
+            val alreadyRunning = activeSessions.value.any { it.activityId == activityId }
+            if (!alreadyRunning) {
+                startActivityUseCase(activityId)
+            }
         }
     }
 
     fun stopSession(session: ActivitySessionEntity) {
+        val now = System.currentTimeMillis()
+        if (now - lastActionTimestamp < 250L) return
+        lastActionTimestamp = now
+
         viewModelScope.launch {
             stopActivityUseCase(session)
         }

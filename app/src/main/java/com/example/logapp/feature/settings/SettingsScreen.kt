@@ -3,14 +3,13 @@ package com.example.logapp.feature.settings
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -19,11 +18,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
 import com.example.logapp.core.designsystem.component.*
 import com.example.logapp.core.designsystem.tokens.spacing
 import com.example.logapp.data.datastore.PreferencesManager
@@ -61,8 +62,10 @@ fun SettingsScreen(
     val dataHealthReport by viewModel.dataHealthReport.collectAsState()
     val isCheckingHealth by viewModel.isCheckingHealth.collectAsState()
     val isRepairingHealth by viewModel.isRepairingHealth.collectAsState()
+    val isClearingData by viewModel.isClearingData.collectAsState()
 
     var showDriveBackupsDialog by remember { mutableStateOf(false) }
+    var showClearDataDialog by remember { mutableStateOf(false) }
     val importPreviewData by viewModel.importPreviewData.collectAsState()
     val context = LocalContext.current
 
@@ -116,68 +119,81 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.large)
         ) {
             // ==========================================
-            // 1. DATA SAFETY & CLOUD SYNC STATE (Phase 6)
+            // 1. GIAO DIỆN & TÙY CHỌN (APPEARANCE)
+            // ==========================================
+            LogAppSectionHeader(
+                title = "TÙY CHỌN GIAO DIỆN",
+                subtitle = "Chế độ hiển thị sáng / tối cho toàn bộ ứng dụng"
+            )
+
+            LogAppCard {
+                Text(
+                    text = "Giao diện hiển thị",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(spacing.small))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.small)
+                ) {
+                    val themeOptions = listOf(
+                        Triple("system", "Hệ thống", "Theo thiết bị"),
+                        Triple("light", "Sáng", "Nền sáng"),
+                        Triple("dark", "Tối", "Nền tối")
+                    )
+                    themeOptions.forEach { (mode, title, desc) ->
+                        val isSelected = (mode == themeMode)
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { viewModel.setThemeMode(mode) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                                     else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = spacing.small, horizontal = spacing.extraSmall),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { viewModel.setThemeMode(mode) },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.height(spacing.extraSmall))
+                                Text(
+                                    text = title,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = desc,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ==========================================
+            // 2. ĐỒNG BỘ & SAO LƯU ĐÁM MÂY (CLOUD SYNC)
             // ==========================================
             LogAppSectionHeader(
                 title = "ĐỒNG BỘ & SAO LƯU ĐÁM MÂY",
-                subtitle = "Trực quan hóa trạng thái an toàn dữ liệu cá nhân"
+                subtitle = "Bảo vệ an toàn và đồng bộ dữ liệu đa thiết bị"
             )
-
-            // Firebase Cloud Sync Status Card
-            LogAppCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(spacing.small))
-                        Text(
-                            text = "Đồng bộ đám mây (Cloud Sync)",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    LogAppStatusBadge(
-                        status = StatusType.NEUTRAL,
-                        text = "Chế độ Cục bộ (Local Only)"
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(spacing.small))
-
-                Text(
-                    text = "Dữ liệu được lưu trữ an toàn 100% trên thiết bị (SQLite/Room). Khi bạn liên kết tài khoản đám mây, hệ thống sẽ tự động đồng bộ 2 chiều mà không làm gián đoạn trải nghiệm ngoại tuyến.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(spacing.small))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Thay đổi cục bộ sẵn sàng đồng bộ:",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "$pendingSyncCount bản ghi",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = if (pendingSyncCount > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
 
             // Google Drive Backup Card
             LogAppElevatedCard {
@@ -186,23 +202,34 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Info,
+                            imageVector = Icons.Default.AccountCircle,
                             contentDescription = null,
                             tint = if (isDriveSignedIn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                         Spacer(modifier = Modifier.width(spacing.small))
-                        Text(
-                            text = "Google Drive Backup",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column {
+                            Text(
+                                text = "Google Drive",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = if (isDriveSignedIn) "Đồng bộ đám mây cá nhân" else "Chưa liên kết tài khoản",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.width(spacing.small))
                     LogAppStatusBadge(
                         status = if (isDriveSignedIn) StatusType.SUCCESS else StatusType.NEUTRAL,
-                        text = if (isDriveSignedIn) "Đã kết nối" else "Chưa liên kết"
+                        text = if (isDriveSignedIn) "Đã kết nối" else "Chưa kết nối"
                     )
                 }
 
@@ -210,25 +237,47 @@ fun SettingsScreen(
 
                 if (isDriveSignedIn) {
                     signedInEmail?.let { email ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = spacing.small, vertical = spacing.extraSmall),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(spacing.extraSmall))
+                                Text(
+                                    text = email,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(spacing.small))
+                    }
+
+                    // Last Backup Time
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = "Tài khoản liên kết: $email",
+                            text = "Bản sao lưu gần nhất:",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-
-                    Spacer(modifier = Modifier.height(spacing.extraSmall))
-
-                    // Last Backup Time
-                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Bản sao lưu gần nhất: ",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = lastBackupTimeFormatted ?: "Chưa có bản sao lưu nào",
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = lastBackupTimeFormatted ?: "Chưa có bản sao lưu",
+                            style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = if (lastBackupTimeFormatted != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -262,18 +311,18 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.height(spacing.small))
                         val isSuccess = msg.contains("thành công")
                         val isError = msg.contains("thất bại") || msg.contains("Lỗi")
-                        
+
                         if (isError) {
                             LogAppErrorState(
                                 title = "Sao lưu Google Drive thất bại",
                                 message = msg,
-                                retryButtonText = "Thử lại (Retry)",
+                                retryButtonText = "Thử lại",
                                 onRetry = { viewModel.triggerBackupNow(context) }
                             )
                         } else {
                             Surface(
                                 color = if (isSuccess) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                        else MaterialTheme.colorScheme.surfaceVariant,
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -281,7 +330,7 @@ fun SettingsScreen(
                                     text = msg,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = if (isSuccess) MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(spacing.small)
                                 )
                             }
@@ -289,7 +338,7 @@ fun SettingsScreen(
                     }
 
                     Spacer(modifier = Modifier.height(spacing.medium))
-                    HorizontalDivider()
+                    HorizontalDivider(thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(spacing.small))
 
                     // Auto Backup Settings
@@ -305,11 +354,12 @@ fun SettingsScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Chạy ngầm qua WorkManager khi có Wi-Fi và pin không yếu",
+                                text = "Chạy ngầm khi có Wi-Fi và pin không yếu",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                        Spacer(modifier = Modifier.width(spacing.small))
                         Switch(
                             checked = autoBackupEnabled,
                             onCheckedChange = { viewModel.setAutoBackupEnabled(context, it) }
@@ -329,7 +379,7 @@ fun SettingsScreen(
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(spacing.small)
                         ) {
-                            listOf("daily" to "Hàng ngày (Daily)", "weekly" to "Hàng tuần (Weekly)", "manual" to "Thủ công (Manual)").forEach { (freq, label) ->
+                            listOf("daily" to "Hàng ngày", "weekly" to "Hàng tuần", "manual" to "Thủ công").forEach { (freq, label) ->
                                 FilterChip(
                                     selected = backupFrequency.equals(freq, ignoreCase = true),
                                     onClick = { viewModel.setBackupFrequency(context, freq) },
@@ -373,13 +423,13 @@ fun SettingsScreen(
                     }
                 } else {
                     Text(
-                        text = "Liên kết tài khoản Google Drive để ứng dụng tự động sao lưu định kỳ các bản ghi lên đám mây cá nhân của bạn, hỗ trợ khôi phục khi chuyển thiết bị.",
+                        text = "Liên kết tài khoản Google Drive để tự động sao lưu dữ liệu cá nhân định kỳ lên đám mây và dễ dàng khôi phục khi đổi thiết bị.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(spacing.medium))
-                    LogAppSecondaryButton(
-                        text = "Liên kết tài khoản Google Drive",
+                    LogAppPrimaryButton(
+                        text = "Liên kết Google Drive",
                         icon = Icons.Default.AccountCircle,
                         onClick = {
                             val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -393,17 +443,87 @@ fun SettingsScreen(
                 }
             }
 
+            // Local Device Storage Card (Fix squished badge bug & Friendly copy)
+            LogAppCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(spacing.small))
+                        Column {
+                            Text(
+                                text = "Lưu trữ nội bộ thiết bị",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Offline-First",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(spacing.small))
+                    LogAppStatusBadge(
+                        status = StatusType.SUCCESS,
+                        text = "Ngoại tuyến an toàn"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(spacing.small))
+
+                Text(
+                    text = "Dữ liệu được lưu trữ an toàn 100% trong bộ nhớ máy. Toàn bộ tính năng hoạt động trọn vẹn ngay cả khi không có kết nối mạng.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (pendingSyncCount > 0) {
+                    Spacer(modifier = Modifier.height(spacing.small))
+                    HorizontalDivider(thickness = 0.5.dp)
+                    Spacer(modifier = Modifier.height(spacing.small))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Bản ghi chờ đồng bộ:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "$pendingSyncCount bản ghi",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
             // ==========================================
-            // 2. LOCAL EXPORT & IMPORT (OFFLINE-FIRST)
+            // 3. SAO LƯU & XUẤT TỆP TIN CỤC BỘ
             // ==========================================
             LogAppSectionHeader(
-                title = "SAO LƯU & XUẤT DỮ LIỆU CỤC BỘ",
-                subtitle = "Xuất và nhập tệp tin lưu trực tiếp trên thiết bị (hoạt động 100% offline)"
+                title = "SAO LƯU & XUẤT TỆP TIN",
+                subtitle = "Xuất và nhập tệp tin lưu trực tiếp trên thiết bị (100% Offline)"
             )
 
             LogAppCard {
                 Text(
-                    text = "Tệp sao lưu độc lập (JSON/CSV) giúp bạn sở hữu trọn vẹn dữ liệu cá nhân, dễ dàng chia sẻ hoặc lưu trữ an toàn trong máy.",
+                    text = "Tệp sao lưu độc lập (JSON / CSV) giúp bạn làm chủ trọn vẹn dữ liệu cá nhân, dễ dàng lưu trữ riêng hoặc chia sẻ sang ứng dụng khác.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -448,17 +568,17 @@ fun SettingsScreen(
             }
 
             // ==========================================
-            // 3. DATA HEALTH & SELF-HEALING
+            // 4. TÌNH TRẠNG CƠ SỞ DỮ LIỆU (DATA HEALTH)
             // ==========================================
             LogAppSectionHeader(
-                title = "TÌNH TRẠNG CƠ SỞ DỮ LIỆU (DATA HEALTH)",
-                subtitle = "Quét và kiểm tra tính toàn vẹn của dữ liệu cục bộ",
+                title = "TÌNH TRẠNG DỮ LIỆU",
+                subtitle = "Kiểm tra tính toàn vẹn và độ tin cậy của dữ liệu",
                 action = {
                     if (isCheckingHealth) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     } else {
                         TextButton(onClick = { viewModel.checkDataHealth() }) {
-                            Text("Kiểm tra")
+                            Text("Quét lại", fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -471,56 +591,105 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Trạng thái cơ sở dữ liệu:",
-                            fontWeight = FontWeight.SemiBold,
-                            style = MaterialTheme.typography.titleSmall
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Tính toàn vẹn dữ liệu",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (report.isHealthy) "Không có lỗi sai lệch hay bản ghi hỏng" else "Phát hiện một số dữ liệu cần khắc phục",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(spacing.small))
+                        LogAppStatusBadge(
+                            status = if (report.isHealthy) StatusType.SUCCESS else StatusType.WARNING,
+                            text = if (report.isHealthy) "Lành mạnh" else "Cần kiểm tra"
                         )
-                        if (report.isHealthy) {
-                            LogAppStatusBadge(
-                                status = StatusType.SUCCESS,
-                                text = "Lành mạnh (Healthy)"
-                            )
-                        } else {
-                            LogAppStatusBadge(
-                                status = StatusType.WARNING,
-                                text = "Có bất thường"
-                            )
+                    }
+
+                    Spacer(modifier = Modifier.height(spacing.medium))
+
+                    // Metric summary boxes
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.small)
+                    ) {
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(spacing.small),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "${report.totalActivities}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Hoạt động hợp lệ",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(spacing.small),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "${report.totalSessions}",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "Phiên ghi nhận",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(spacing.small))
-                    HorizontalDivider(thickness = 0.5.dp)
-                    Spacer(modifier = Modifier.height(spacing.small))
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Tổng số hoạt động:", style = MaterialTheme.typography.bodySmall)
-                        Text("${report.totalActivities} hợp lệ", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Tổng số phiên ghi nhận:", style = MaterialTheme.typography.bodySmall)
-                        Text("${report.totalSessions} hợp lệ", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Bản ghi mồ côi (Orphan):", style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            text = if (report.orphanSessionsCount == 0) "✓ Không có" else "⚠ ${report.orphanSessionsCount} phiên",
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (report.orphanSessionsCount == 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Mốc thời gian (Timestamps):", style = MaterialTheme.typography.bodySmall)
-                        Text(
-                            text = if (report.invalidTimestampCount == 0) "✓ Nhất quán" else "⚠ ${report.invalidTimestampCount} phiên sai lệch",
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (report.invalidTimestampCount == 0) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-
                     if (report.hasIssues) {
+                        Spacer(modifier = Modifier.height(spacing.small))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(spacing.small)) {
+                                if (report.orphanSessionsCount > 0) {
+                                    Text(
+                                        text = "• ${report.orphanSessionsCount} phiên ghi mất liên kết với hoạt động",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                                if (report.invalidTimestampCount > 0) {
+                                    Text(
+                                        text = "• ${report.invalidTimestampCount} phiên có mốc thời gian không nhất quán",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(spacing.small))
                         LogAppDangerButton(
                             text = if (isRepairingHealth) "Đang tự động khắc phục..." else "Tự động sửa lỗi dữ liệu (Self-Healing)",
@@ -532,35 +701,55 @@ fun SettingsScreen(
             }
 
             // ==========================================
-            // 4. GENERAL PREFERENCES (Theme & Day Boundary)
+            // 5. VÙNG NGUY HIỂM (DANGER ZONE)
             // ==========================================
             LogAppSectionHeader(
-                title = "TÙY CHỌN ỨNG DỤNG",
-                subtitle = "Chế độ giao diện và mốc bắt đầu ngày mới"
+                title = "VÙNG NGUY HIỂM",
+                subtitle = "Thao tác không thể hoàn tác trên thiết bị này"
             )
 
             LogAppCard {
-                Text("Giao diện ứng dụng", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Xóa toàn bộ dữ liệu ứng dụng",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
                 Spacer(modifier = Modifier.height(spacing.extraSmall))
-                Column(Modifier.selectableGroup()) {
-                    listOf("system" to "Mặc định hệ thống", "light" to "Giao diện sáng", "dark" to "Giao diện tối").forEach { (value, label) ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                                .selectable(
-                                    selected = (value == themeMode),
-                                    onClick = { viewModel.setThemeMode(value) },
-                                    role = Role.RadioButton
-                                ),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(selected = (value == themeMode), onClick = null)
-                            Text(text = label, modifier = Modifier.padding(start = spacing.small))
-                        }
-                    }
-                }
+                Text(
+                    text = "Xóa sạch toàn bộ hoạt động, lịch sử các phiên bấm giờ và khôi phục ứng dụng về trạng thái ban đầu như mới cài đặt.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(spacing.medium))
+                LogAppDangerButton(
+                    text = "Xóa toàn bộ dữ liệu...",
+                    icon = Icons.Default.Delete,
+                    onClick = { showClearDataDialog = true }
+                )
+            }
 
+            // ==========================================
+            // 6. THÔNG TIN ỨNG DỤNG (ABOUT FOOTER)
+            // ==========================================
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = spacing.medium),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "TimeLens",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(spacing.extraSmall))
+                Text(
+                    text = "Phiên bản 1.0.0 • 100% Quyền riêng tư & Lưu trữ cục bộ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
             }
 
             Spacer(modifier = Modifier.height(spacing.extraLarge))
@@ -648,6 +837,142 @@ fun SettingsScreen(
             isImporting = isImporting,
             onDismiss = { viewModel.clearImportPreview() },
             onConfirm = { strategy -> viewModel.confirmImport(strategy) }
+        )
+    }
+
+    // Clear All Data Confirmation Dialog (with 10s countdown & mandatory checkbox)
+    if (showClearDataDialog) {
+        var countdownSeconds by remember { mutableIntStateOf(10) }
+        var isAgreed by remember { mutableStateOf(false) }
+
+        LaunchedEffect(Unit) {
+            while (countdownSeconds > 0) {
+                delay(1000L)
+                countdownSeconds--
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = {
+                if (!isClearingData) showClearDataDialog = false
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "XÓA TOÀN BỘ DỮ LIỆU",
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(spacing.small)
+                ) {
+                    Text(
+                        text = "Cảnh báo: Hành động này có mức độ rủi ro cực cao và KHÔNG THỂ HOÀN TÁC sau khi thực hiện!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(spacing.small),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Dữ liệu sẽ bị xóa sạch bao gồm:",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text("• Tất cả các hoạt động & danh mục đã tạo", style = MaterialTheme.typography.bodySmall)
+                            Text("• Toàn bộ lịch sử các phiên bấm giờ", style = MaterialTheme.typography.bodySmall)
+                            Text("• Mọi dữ liệu phân tích, thống kê & ghi chú", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+
+                    Text(
+                        text = "Lưu ý: Thao tác này chỉ xóa dữ liệu trên thiết bị này. Các bản sao lưu trên Google Drive hoặc tệp JSON/CSV đã xuất trước đó sẽ không bị ảnh hưởng.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(spacing.extraSmall))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(enabled = !isClearingData) { isAgreed = !isAgreed }
+                            .padding(vertical = spacing.extraSmall),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = isAgreed,
+                            onCheckedChange = { isAgreed = it },
+                            enabled = !isClearingData
+                        )
+                        Spacer(modifier = Modifier.width(spacing.extraSmall))
+                        Text(
+                            text = "Tôi hiểu và đồng ý xóa vĩnh viễn toàn bộ dữ liệu trên thiết bị này.",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                val canConfirm = (countdownSeconds == 0) && isAgreed && !isClearingData
+                Button(
+                    onClick = {
+                        viewModel.clearAllData()
+                        showClearDataDialog = false
+                    },
+                    enabled = canConfirm,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                        disabledContainerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.25f),
+                        disabledContentColor = MaterialTheme.colorScheme.onError.copy(alpha = 0.5f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    if (isClearingData) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onError,
+                            strokeWidth = 2.dp
+                        )
+                    } else if (countdownSeconds > 0) {
+                        Text("Xác nhận xóa (${countdownSeconds}s)", fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("Xác nhận xóa vĩnh viễn", fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showClearDataDialog = false },
+                    enabled = !isClearingData,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Hủy bỏ")
+                }
+            }
         )
     }
 }

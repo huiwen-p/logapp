@@ -45,7 +45,8 @@ class StartActivityUseCase @Inject constructor(
             )
         }
         
-        val activity = activityRepository.getAllActivities().firstOrNull()?.find { it.id == activityId }
+        val activity = activityRepository.getActivityById(activityId)
+            ?: activityRepository.getAllActivities().firstOrNull()?.find { it.id == activityId }
         notificationController.showActiveSessionNotification(
             sessionId = session.id,
             activityName = activity?.name ?: "Unknown Activity",
